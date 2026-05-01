@@ -721,4 +721,5 @@ if __name__=="__main__":
     print("\n  Open your browser at:  http://localhost:8000")
     print("  Press Ctrl+C to stop")
     print("="*50+"\n")
-    app.run(debug=False,port=8000)
+    port = int(os.environ.get("PORT", 8000))
+app.run(debug=False, host="0.0.0.0", port=port)
