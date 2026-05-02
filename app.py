@@ -26,9 +26,14 @@ OPENING_DB = {
         "description":"You play fast, sharp, and tactical. You love to attack and create chaos on the board.",
         "tip":"Study tactics puzzles daily — your style wins or loses on calculation.",
         "openings":[
-            {"name":"Sicilian Defense: Najdorf","moves":"e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6","pgn":"1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 a6","difficulty":"Advanced","players":"Fischer, Kasparov","why":"Sharpest reply to 1.e4 — leads to richly complex attacking positions"},
-            {"name":"King's Gambit","moves":"e4 e5 f4","pgn":"1.e4 e5 2.f4","difficulty":"Intermediate","players":"Tal, Morphy","why":"Sacrifices a pawn immediately for a blazing kingside attack"},
-            {"name":"Vienna Game","moves":"e4 e5 Nc3 Nf6 Bc4","pgn":"1.e4 e5 2.Nc3 Nf6 3.Bc4","difficulty":"Intermediate","players":"Spielmann, Morozevich","why":"Flexible and aggressive — transposes into many sharp tactical lines"},
+            {"name":"Sicilian Defense: Najdorf","moves":"e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6","pgn":"1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 a6","difficulty":"Advanced","players":"Fischer, Kasparov, Hikaru","why":"Sharpest reply to 1.e4 — leads to richly complex attacking positions","elo_min":0},
+            {"name":"King's Gambit","moves":"e4 e5 f4 exf4 Nf3","pgn":"1.e4 e5 2.f4 exf4 3.Nf3","difficulty":"Intermediate","players":"Tal, Morphy, Spassky","why":"Sacrifices a pawn immediately for a blazing kingside attack","elo_min":0},
+            {"name":"Vienna Game","moves":"e4 e5 Nc3 Nf6 Bc4","pgn":"1.e4 e5 2.Nc3 Nf6 3.Bc4","difficulty":"Intermediate","players":"Spielmann, Morozevich","why":"Flexible and aggressive — transposes into many sharp tactical lines","elo_min":0},
+            {"name":"Sicilian Defense: Dragon","moves":"e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 g6","pgn":"1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 g6","difficulty":"Advanced","players":"Karjakin, Topalov","why":"Double-edged race — you attack the kingside while White goes queenside","elo_min":800},
+            {"name":"Latvian Gambit","moves":"e4 e5 Nf3 f5","pgn":"1.e4 e5 2.Nf3 f5","difficulty":"Intermediate","players":"Shirov (fan)","why":"Wild and chaotic — perfect for players who love to surprise opponents early","elo_min":0},
+            {"name":"Alekhine's Defense","moves":"e4 Nf6 e5 Nd5 d4 d6","pgn":"1.e4 Nf6 2.e5 Nd5 3.d4 d6","difficulty":"Intermediate","players":"Alekhine, Bagirov","why":"Provokes White's pawns to overextend, then attacks them as weaknesses","elo_min":0},
+            {"name":"Budapest Gambit","moves":"d4 Nf6 c4 e5 dxe5 Ng4","pgn":"1.d4 Nf6 2.c4 e5 3.dxe5 Ng4","difficulty":"Intermediate","players":"Rubinstein, Spielmann","why":"An early gambit that leads to wild positions — great shock value in blitz","elo_min":0},
+            {"name":"Scotch Gambit","moves":"e4 e5 Nf3 Nc6 d4 exd4 Bc4","pgn":"1.e4 e5 2.Nf3 Nc6 3.d4 exd4 4.Bc4","difficulty":"Intermediate","players":"Morphy, Kasparov","why":"Fast development with piece activity — leads to open tactical battles","elo_min":0},
         ]
     },
     "Classical": {
@@ -36,9 +41,14 @@ OPENING_DB = {
         "description":"You follow sound principles — develop pieces, control the center, castle early.",
         "tip":"Study endgames — classical players convert small advantages in long games.",
         "openings":[
-            {"name":"Ruy Lopez (Spanish Opening)","moves":"e4 e5 Nf3 Nc6 Bb5","pgn":"1.e4 e5 2.Nf3 Nc6 3.Bb5","difficulty":"Intermediate","players":"Karpov, Capablanca, Fischer","why":"The most classical opening — puts long-term pressure on the e5 pawn"},
-            {"name":"Italian Game","moves":"e4 e5 Nf3 Nc6 Bc4 Bc5","pgn":"1.e4 e5 2.Nf3 Nc6 3.Bc4 Bc5","difficulty":"Beginner","players":"Carlsen, Greco","why":"Perfect for learning classical principles — simple and effective"},
-            {"name":"Four Knights Game","moves":"e4 e5 Nf3 Nc6 Nc3 Nf6","pgn":"1.e4 e5 2.Nf3 Nc6 3.Nc3 Nf6","difficulty":"Beginner","players":"Rubinstein, Marshall","why":"Symmetrical principled development — great for building opening fundamentals"},
+            {"name":"Ruy Lopez (Spanish Opening)","moves":"e4 e5 Nf3 Nc6 Bb5","pgn":"1.e4 e5 2.Nf3 Nc6 3.Bb5","difficulty":"Intermediate","players":"Karpov, Capablanca, Fischer","why":"The most classical opening — puts long-term pressure on the e5 pawn","elo_min":0},
+            {"name":"Italian Game: Giuoco Piano","moves":"e4 e5 Nf3 Nc6 Bc4 Bc5 c3","pgn":"1.e4 e5 2.Nf3 Nc6 3.Bc4 Bc5 4.c3","difficulty":"Beginner","players":"Carlsen, Greco","why":"Perfect for learning classical principles — simple, sound, and effective","elo_min":0},
+            {"name":"Four Knights Game","moves":"e4 e5 Nf3 Nc6 Nc3 Nf6","pgn":"1.e4 e5 2.Nf3 Nc6 3.Nc3 Nf6","difficulty":"Beginner","players":"Rubinstein, Marshall","why":"Symmetrical principled development — great for building opening fundamentals","elo_min":0},
+            {"name":"Petrov's Defense","moves":"e4 e5 Nf3 Nf6 Nxe5 d6 Nf3 Nxe4","pgn":"1.e4 e5 2.Nf3 Nf6 3.Nxe5 d6 4.Nf3 Nxe4","difficulty":"Intermediate","players":"Kramnik, Anand","why":"Ultra-solid reply — difficult to lose but requires precision to win","elo_min":0},
+            {"name":"Ruy Lopez: Berlin Defense","moves":"e4 e5 Nf3 Nc6 Bb5 Nf6","pgn":"1.e4 e5 2.Nf3 Nc6 3.Bb5 Nf6","difficulty":"Advanced","players":"Kramnik, Carlsen","why":"The 'Berlin Wall' — endgame-focused and extremely hard to crack","elo_min":1000},
+            {"name":"Scotch Game","moves":"e4 e5 Nf3 Nc6 d4 exd4 Nxd4","pgn":"1.e4 e5 2.Nf3 Nc6 3.d4 exd4 4.Nxd4","difficulty":"Intermediate","players":"Kasparov, Carlsen","why":"Opens the center early — leads to rich tactical and positional play","elo_min":0},
+            {"name":"Bishop's Opening","moves":"e4 e5 Bc4","pgn":"1.e4 e5 2.Bc4","difficulty":"Beginner","players":"Greco, Fischer","why":"Simple and principled — targets f7 immediately and keeps options flexible","elo_min":0},
+            {"name":"Three Knights Game","moves":"e4 e5 Nf3 Nc6 Nc3","pgn":"1.e4 e5 2.Nf3 Nc6 3.Nc3","difficulty":"Beginner","players":"Spassky","why":"Rapid development with options to steer into sharp or solid lines","elo_min":0},
         ]
     },
     "Strategic": {
@@ -46,9 +56,14 @@ OPENING_DB = {
         "description":"You think long-term. Pawn structures and slow accumulation of advantages define your game.",
         "tip":"Study pawn structures — strategic players win by knowing which breaks to make.",
         "openings":[
-            {"name":"Queen's Gambit Declined","moves":"d4 d5 c4 e6 Nc3 Nf6","pgn":"1.d4 d5 2.c4 e6 3.Nc3 Nf6","difficulty":"Intermediate","players":"Karpov, Kramnik, Carlsen","why":"Solid structure with rich positional play and long-term pressure"},
-            {"name":"King's Indian Defense","moves":"d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3","pgn":"1.d4 Nf6 2.c4 g6 3.Nc3 Bg7 4.e4 d6 5.Nf3","difficulty":"Advanced","players":"Fischer, Kasparov","why":"Lets White take the center, then launches a fierce counterattack"},
-            {"name":"English Opening","moves":"c4 e5 Nc3 Nf6 Nf3","pgn":"1.c4 e5 2.Nc3 Nf6 3.Nf3","difficulty":"Intermediate","players":"Karpov, Botvinnik","why":"Flexible hypermodern — delays the center fight for strategic maneuvering"},
+            {"name":"Queen's Gambit Declined","moves":"d4 d5 c4 e6 Nc3 Nf6","pgn":"1.d4 d5 2.c4 e6 3.Nc3 Nf6","difficulty":"Intermediate","players":"Karpov, Kramnik, Carlsen","why":"Solid structure with rich positional play and long-term pressure","elo_min":0},
+            {"name":"King's Indian Defense","moves":"d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3","pgn":"1.d4 Nf6 2.c4 g6 3.Nc3 Bg7 4.e4 d6 5.Nf3","difficulty":"Advanced","players":"Fischer, Kasparov","why":"Lets White take the center, then launches a fierce counterattack","elo_min":800},
+            {"name":"English Opening","moves":"c4 e5 Nc3 Nf6 Nf3","pgn":"1.c4 e5 2.Nc3 Nf6 3.Nf3","difficulty":"Intermediate","players":"Karpov, Botvinnik","why":"Flexible hypermodern — delays the center fight for strategic maneuvering","elo_min":0},
+            {"name":"Nimzo-Indian Defense","moves":"d4 Nf6 c4 e6 Nc3 Bb4","pgn":"1.d4 Nf6 2.c4 e6 3.Nc3 Bb4","difficulty":"Intermediate","players":"Nimzowitsch, Kasparov, Karpov","why":"Controls the center with pieces rather than pawns — rich strategic battles","elo_min":0},
+            {"name":"Catalan Opening","moves":"d4 Nf6 c4 e6 g3 d5 Bg2","pgn":"1.d4 Nf6 2.c4 e6 3.g3 d5 4.Bg2","difficulty":"Advanced","players":"Kramnik, Carlsen","why":"Long-term pressure down the c-file and d-diagonal — positional masterclass","elo_min":1000},
+            {"name":"Reti Opening","moves":"Nf3 d5 c4","pgn":"1.Nf3 d5 2.c4","difficulty":"Intermediate","players":"Reti, Karpov","why":"Hypermodern — attacks the center from the flanks with pieces, not pawns","elo_min":0},
+            {"name":"London System","moves":"d4 d5 Nf3 Nf6 Bf4 e6 e3","pgn":"1.d4 d5 2.Nf3 Nf6 3.Bf4 e6 4.e3","difficulty":"Beginner","players":"Carlsen, Giri","why":"Simple, solid setup that avoids heavy theory — grind opponents down slowly","elo_min":0},
+            {"name":"Queen's Gambit Accepted","moves":"d4 d5 c4 dxc4 Nf3 Nf6","pgn":"1.d4 d5 2.c4 dxc4 3.Nf3 Nf6","difficulty":"Intermediate","players":"Anand, Spassky","why":"Taking the gambit pawn leads to active piece play and open positions","elo_min":0},
         ]
     },
     "Solid": {
@@ -56,9 +71,14 @@ OPENING_DB = {
         "description":"You value safety and reliability. You avoid complications and build from a secure foundation.",
         "tip":"Work on converting small advantages — solid players win by slowly outplaying opponents.",
         "openings":[
-            {"name":"Caro-Kann Defense","moves":"e4 c6 d4 d5 Nc3 dxe4 Nxe4","pgn":"1.e4 c6 2.d4 d5 3.Nc3 dxe4 4.Nxe4","difficulty":"Intermediate","players":"Petrosian, Karpov, Anand","why":"Rock-solid structure — avoids early complications without being passive"},
-            {"name":"French Defense","moves":"e4 e6 d4 d5 Nc3 Nf6","pgn":"1.e4 e6 2.d4 d5 3.Nc3 Nf6","difficulty":"Intermediate","players":"Nimzowitsch, Uhlmann","why":"Creates a solid pawn chain and leads to rich strategic battles"},
-            {"name":"Slav Defense","moves":"d4 d5 c4 c6 Nf3 Nf6 Nc3","pgn":"1.d4 d5 2.c4 c6 3.Nf3 Nf6 4.Nc3","difficulty":"Intermediate","players":"Kramnik, Anand","why":"Extremely reliable against the Queen's Gambit — solid with counterplay"},
+            {"name":"Caro-Kann Defense","moves":"e4 c6 d4 d5 Nc3 dxe4 Nxe4","pgn":"1.e4 c6 2.d4 d5 3.Nc3 dxe4 4.Nxe4","difficulty":"Intermediate","players":"Petrosian, Karpov, Anand","why":"Rock-solid structure — avoids early complications without being passive","elo_min":0},
+            {"name":"French Defense","moves":"e4 e6 d4 d5 Nc3 Nf6","pgn":"1.e4 e6 2.d4 d5 3.Nc3 Nf6","difficulty":"Intermediate","players":"Nimzowitsch, Uhlmann","why":"Creates a solid pawn chain and leads to rich strategic battles","elo_min":0},
+            {"name":"Slav Defense","moves":"d4 d5 c4 c6 Nf3 Nf6 Nc3","pgn":"1.d4 d5 2.c4 c6 3.Nf3 Nf6 4.Nc3","difficulty":"Intermediate","players":"Kramnik, Anand","why":"Extremely reliable against the Queen's Gambit — solid with counterplay","elo_min":0},
+            {"name":"Scandinavian Defense","moves":"e4 d5 exd5 Qxd5 Nc3 Qa5","pgn":"1.e4 d5 2.exd5 Qxd5 3.Nc3 Qa5","difficulty":"Beginner","players":"Tiviakov, Carlsen (occasional)","why":"Immediate central challenge — simple and easy to learn for all levels","elo_min":0},
+            {"name":"Semi-Slav Defense","moves":"d4 d5 c4 c6 Nf3 Nf6 Nc3 e6","pgn":"1.d4 d5 2.c4 c6 3.Nf3 Nf6 4.Nc3 e6","difficulty":"Advanced","players":"Anand, Topalov","why":"One of the most theoretically rich defenses — solid yet full of counterplay","elo_min":800},
+            {"name":"King's Indian Attack","moves":"Nf3 d5 g3 Nf6 Bg2 e6 O-O","pgn":"1.Nf3 d5 2.g3 Nf6 3.Bg2 e6 4.O-O","difficulty":"Intermediate","players":"Fischer, Karpov","why":"White sets up a safe king and waits for the right moment to strike","elo_min":0},
+            {"name":"Dutch Defense: Stonewall","moves":"d4 f5 c4 Nf6 g3 e6 Bg2 d5","pgn":"1.d4 f5 2.c4 Nf6 3.g3 e6 4.Bg2 d5","difficulty":"Intermediate","players":"Botvinnik, Short","why":"A fortress structure — difficult to break down, ideal for patient players","elo_min":0},
+            {"name":"Caro-Kann: Classical","moves":"e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5","pgn":"1.e4 c6 2.d4 d5 3.Nc3 dxe4 4.Nxe4 Bf5","difficulty":"Intermediate","players":"Karpov, Leko","why":"Keeps the light-squared bishop active — a refined, solid approach","elo_min":0},
         ]
     },
 }
@@ -259,11 +279,53 @@ def train_models(records, progress_cb=None):
     if progress_cb: progress_cb(f"✅ Best: {best_name} ({round(best_acc*100,1)}%)")
     return saved,None
 
+def validate_username(username):
+    """Check if a Chess.com username exists. Returns (True, None) or (False, error_msg)."""
+    try:
+        r=requests.get(f"https://api.chess.com/pub/player/{username}",headers=HEADERS,timeout=8)
+        if r.status_code==404: return False,f"Player '{username}' not found on Chess.com. Check the spelling."
+        if r.status_code!=200: return False,f"Chess.com returned an error ({r.status_code}). Try again later."
+        return True,None
+    except requests.Timeout: return False,"Request timed out. Chess.com may be slow — try again."
+    except Exception as e: return False,f"Could not reach Chess.com: {e}"
+
+def pick_openings(family, player_stats, n=3):
+    """Pick n openings from the family, varied by player ELO and stats."""
+    import random
+    pool=OPENING_DB[family]["openings"]
+    elo=player_stats.get("avg_elo",1000)
+    # Filter by ELO appropriateness
+    eligible=[o for o in pool if o.get("elo_min",0)<=elo]
+    if len(eligible)<n: eligible=pool  # fall back to all if too few
+    # Seed random with username+elo so same player always gets same recs but differs from others
+    rng=random.Random(hash((player_stats.get("username",""),round(elo,-2))))
+    # Weight towards harder openings for higher ELO players
+    if elo>1500:
+        advanced=[o for o in eligible if o["difficulty"]=="Advanced"]
+        beginner=[o for o in eligible if o["difficulty"]=="Beginner"]
+        mid=[o for o in eligible if o["difficulty"]=="Intermediate"]
+        weighted=advanced*3+mid*2+beginner*1
+    else:
+        advanced=[o for o in eligible if o["difficulty"]=="Advanced"]
+        beginner=[o for o in eligible if o["difficulty"]=="Beginner"]
+        mid=[o for o in eligible if o["difficulty"]=="Intermediate"]
+        weighted=beginner*3+mid*2+advanced*1
+    if len(weighted)<n: weighted=eligible
+    seen=set(); picks=[]
+    rng.shuffle(weighted)
+    for o in weighted:
+        if o["name"] not in seen:
+            seen.add(o["name"]); picks.append(o)
+        if len(picks)==n: break
+    return picks
+
 def recommend_for_user(username):
     if not os.path.exists("best_model.pkl"): return None,"Model not trained yet."
+    valid,verr=validate_username(username)
+    if not valid: return None,verr
     with open("best_model.pkl","rb") as f: saved=pickle.load(f)
     records=fetch_all_games([username],months=2)
-    if not records: return None,f"No games found for '{username}'."
+    if not records: return None,f"No games found for '{username}'. They may have no recent games."
     df=pd.DataFrame(records)
     agg={"player_elo":df["player_elo"].mean(),"opponent_elo":df["opponent_elo"].mean(),
          "elo_diff":df["elo_diff"].mean(),"played_as_enc":df["played_as_enc"].mean(),
@@ -283,12 +345,14 @@ def recommend_for_user(username):
         probs={c:round(float(p)*100,1) for c,p in zip(saved["classes"],raw)}
     else: probs={pred:100.0}
     info=OPENING_DB[pred]
+    player_stats={"username":username,"avg_elo":round(agg["player_elo"]),"win_rate":round(agg["win_rate"]*100,1),
+                  "draw_rate":round(agg["draw_rate"]*100,1),"avg_moves":round(agg["num_moves"],1),
+                  "resign_rate":round(agg["resign_rate"]*100,1),"games_analyzed":len(df)}
+    chosen_openings=pick_openings(pred, player_stats)
     return {"username":username,"predicted_family":pred,"probabilities":probs,
-            "openings":info["openings"],
+            "openings":chosen_openings,
             "style_info":{"emoji":info["emoji"],"color":info["color"],"description":info["description"],"tip":info["tip"]},
-            "player_stats":{"avg_elo":round(agg["player_elo"]),"win_rate":round(agg["win_rate"]*100,1),
-                            "draw_rate":round(agg["draw_rate"]*100,1),"avg_moves":round(agg["num_moves"],1),
-                            "resign_rate":round(agg["resign_rate"]*100,1),"games_analyzed":len(df)},
+            "player_stats":player_stats,
             "model_used":model_name,"model_accuracy":saved["results"].get(model_name,0)},None
 
 training_state={"status":"idle","logs":[],"result":None,"error":None}
@@ -548,6 +612,79 @@ function buildBoardHTML(id){
   return h+'</div>';
 }
 
+// ── CHESS SOUND ENGINE ──────────────────────────────────────
+const AudioCtx=window.AudioContext||window.webkitAudioContext;
+let actx=null;
+function getACtx(){if(!actx)actx=new AudioCtx();return actx;}
+
+function playMoveSound(type='move'){
+  try{
+    const ac=getACtx();
+    if(type==='move'){
+      // Wooden piece-on-board thud — two-layer: click + resonance
+      const buf=ac.createBuffer(1,ac.sampleRate*0.18,ac.sampleRate);
+      const d=buf.getChannelData(0);
+      for(let i=0;i<d.length;i++){
+        const t=i/ac.sampleRate;
+        d[i]=(Math.random()*2-1)*Math.exp(-t*55)*(0.6+0.4*Math.exp(-t*120));
+      }
+      const src=ac.createBufferSource();src.buffer=buf;
+      const g=ac.createGain();g.gain.setValueAtTime(0.55,ac.currentTime);
+      // Slight low-pass to make it warmer/woodier
+      const f=ac.createBiquadFilter();f.type='lowpass';f.frequency.value=2800;
+      src.connect(f);f.connect(g);g.connect(ac.destination);
+      src.start();
+    } else if(type==='capture'){
+      // Heavier thud for captures
+      const buf=ac.createBuffer(1,ac.sampleRate*0.22,ac.sampleRate);
+      const d=buf.getChannelData(0);
+      for(let i=0;i<d.length;i++){
+        const t=i/ac.sampleRate;
+        d[i]=(Math.random()*2-1)*Math.exp(-t*38)*(0.9+0.4*Math.exp(-t*90));
+      }
+      const src=ac.createBufferSource();src.buffer=buf;
+      const g=ac.createGain();g.gain.setValueAtTime(0.75,ac.currentTime);
+      const f=ac.createBiquadFilter();f.type='lowpass';f.frequency.value=2200;
+      src.connect(f);f.connect(g);g.connect(ac.destination);
+      src.start();
+    } else if(type==='check'){
+      // Higher pitched alert tone
+      const osc=ac.createOscillator();const g=ac.createGain();
+      osc.connect(g);g.connect(ac.destination);
+      osc.frequency.setValueAtTime(880,ac.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(660,ac.currentTime+0.12);
+      g.gain.setValueAtTime(0.3,ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.22);
+      osc.start();osc.stop(ac.currentTime+0.22);
+    } else if(type==='start'){
+      // Soft thud for board reset
+      const buf=ac.createBuffer(1,ac.sampleRate*0.12,ac.sampleRate);
+      const d=buf.getChannelData(0);
+      for(let i=0;i<d.length;i++){
+        const t=i/ac.sampleRate;
+        d[i]=(Math.random()*2-1)*Math.exp(-t*80)*0.4;
+      }
+      const src=ac.createBufferSource();src.buffer=buf;
+      const g=ac.createGain();g.gain.value=0.35;
+      const f=ac.createBiquadFilter();f.type='lowpass';f.frequency.value=3200;
+      src.connect(f);f.connect(g);g.connect(ac.destination);
+      src.start();
+    }
+  }catch(e){}
+}
+
+function detectMoveType(boardBefore,boardAfter){
+  if(!boardBefore||!boardAfter)return'move';
+  // Count pieces on boardAfter vs boardBefore — if fewer pieces, it's a capture
+  let before=0,after=0;
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+    if(boardBefore[r][c])before++;
+    if(boardAfter[r][c])after++;
+  }
+  return after<before?'capture':'move';
+}
+// ── END SOUND ENGINE ─────────────────────────────────────────
+
 function renderBoard(id,board,lmFrom,lmTo){
   for(let r=0;r<8;r++)for(let c=0;c<8;c++){
     const el=document.getElementById(`${id}_${r}_${c}`);
@@ -577,20 +714,28 @@ function initOpeningBoard(id,movesStr){
 
 function stepMove(id,dir){
   const s=BS[id];if(!s)return;
+  const prev=s.currentMove;
   s.currentMove=Math.max(0,Math.min(s.boards.length-1,s.currentMove+dir));
-  const lmFrom=s.currentMove>0?null:null;
+  if(s.currentMove!==prev&&dir!==0){
+    const type=detectMoveType(s.boards[prev],s.boards[s.currentMove]);
+    playMoveSound(type);
+  }
   renderBoard(id,s.boards[s.currentMove],null,null);
   updateCtr(id);
 }
 
-function resetBoard(id){const s=BS[id];if(!s)return;s.currentMove=0;renderBoard(id,s.boards[0],null,null);updateCtr(id);}
+function resetBoard(id){const s=BS[id];if(!s)return;s.currentMove=0;renderBoard(id,s.boards[0],null,null);updateCtr(id);playMoveSound('start');}
 
 function playAll(id){
   const s=BS[id];if(!s)return;
-  s.currentMove=0;renderBoard(id,s.boards[0],null,null);updateCtr(id);
+  s.currentMove=0;renderBoard(id,s.boards[0],null,null);updateCtr(id);playMoveSound('start');
   const iv=setInterval(()=>{
     if(s.currentMove>=s.boards.length-1){clearInterval(iv);return;}
-    s.currentMove++;renderBoard(id,s.boards[s.currentMove],null,null);updateCtr(id);
+    const prev=s.currentMove;
+    s.currentMove++;
+    const type=detectMoveType(s.boards[prev],s.boards[s.currentMove]);
+    playMoveSound(type);
+    renderBoard(id,s.boards[s.currentMove],null,null);updateCtr(id);
   },650);
 }
 
@@ -715,11 +860,12 @@ function renderResult(d){
 </html>"""
 
 if __name__=="__main__":
+    import os
     print("\n"+"="*50)
     print("  Chess Opening Recommender — GUI")
     print("="*50)
-    print("\n  Open your browser at:  http://localhost:8000")
+    print("\n  Open your browser at:  http://localhost:5000")
     print("  Press Ctrl+C to stop")
     print("="*50+"\n")
-    port = int(os.environ.get("PORT", 8000))
-app.run(debug=False, host="0.0.0.0", port=port)
+    port=int(os.environ.get("PORT",5000))
+    app.run(debug=False,host="0.0.0.0",port=port)
