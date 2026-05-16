@@ -8,6 +8,8 @@ HOW TO RUN:
 from flask import Flask, render_template_string, jsonify, request
 import requests, pandas as pd, numpy as np
 import re, threading, time, pickle, os, warnings
+from sklearn.neural_network import MLPClassifier
+from sklearn.cluster import KMeans
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
@@ -26,14 +28,62 @@ OPENING_DB = {
         "description":"You play fast, sharp, and tactical. You love to attack and create chaos on the board.",
         "tip":"Study tactics puzzles daily — your style wins or loses on calculation.",
         "openings":[
-            {"name":"Sicilian Defense: Najdorf","moves":"e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6","pgn":"1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 a6","difficulty":"Advanced","players":"Fischer, Kasparov, Hikaru","why":"Sharpest reply to 1.e4 — leads to richly complex attacking positions","elo_min":0},
-            {"name":"King's Gambit","moves":"e4 e5 f4 exf4 Nf3","pgn":"1.e4 e5 2.f4 exf4 3.Nf3","difficulty":"Intermediate","players":"Tal, Morphy, Spassky","why":"Sacrifices a pawn immediately for a blazing kingside attack","elo_min":0},
-            {"name":"Vienna Game","moves":"e4 e5 Nc3 Nf6 Bc4","pgn":"1.e4 e5 2.Nc3 Nf6 3.Bc4","difficulty":"Intermediate","players":"Spielmann, Morozevich","why":"Flexible and aggressive — transposes into many sharp tactical lines","elo_min":0},
-            {"name":"Sicilian Defense: Dragon","moves":"e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 g6","pgn":"1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 g6","difficulty":"Advanced","players":"Karjakin, Topalov","why":"Double-edged race — you attack the kingside while White goes queenside","elo_min":800},
-            {"name":"Latvian Gambit","moves":"e4 e5 Nf3 f5","pgn":"1.e4 e5 2.Nf3 f5","difficulty":"Intermediate","players":"Shirov (fan)","why":"Wild and chaotic — perfect for players who love to surprise opponents early","elo_min":0},
-            {"name":"Alekhine's Defense","moves":"e4 Nf6 e5 Nd5 d4 d6","pgn":"1.e4 Nf6 2.e5 Nd5 3.d4 d6","difficulty":"Intermediate","players":"Alekhine, Bagirov","why":"Provokes White's pawns to overextend, then attacks them as weaknesses","elo_min":0},
-            {"name":"Budapest Gambit","moves":"d4 Nf6 c4 e5 dxe5 Ng4","pgn":"1.d4 Nf6 2.c4 e5 3.dxe5 Ng4","difficulty":"Intermediate","players":"Rubinstein, Spielmann","why":"An early gambit that leads to wild positions — great shock value in blitz","elo_min":0},
-            {"name":"Scotch Gambit","moves":"e4 e5 Nf3 Nc6 d4 exd4 Bc4","pgn":"1.e4 e5 2.Nf3 Nc6 3.d4 exd4 4.Bc4","difficulty":"Intermediate","players":"Morphy, Kasparov","why":"Fast development with piece activity — leads to open tactical battles","elo_min":0},
+            {"name":"Sicilian Defense: Najdorf","moves":"e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6","pgn":"1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 a6","difficulty":"Advanced","players":"Fischer, Kasparov, Hikaru","why":"Sharpest reply to 1.e4 — leads to richly complex attacking positions","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Sicilian-Defense-Najdorf-Variation",
+             "puzzles":[
+               {"fen":"r1bqkb1r/1p2pppp/p1np1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 7","prompt":"White to move: find the best aggressive continuation after a6","answer":"f4","hint":"Push a pawn to restrict Black and prepare f5"},
+               {"fen":"r1bqkb1r/1p2pppp/p1np1n2/6B1/3NP3/2N5/PPP2PPP/R2QKB1R b KQkq - 1 7","prompt":"Black to move: how should Black challenge the Bg5 pin?","answer":"e6","hint":"Release the pin and fight for the center"},
+               {"fen":"r1bqk2r/pp2bppp/2nppn2/8/2BNP3/2N5/PPP2PPP/R1BQK2R w KQkq - 4 8","prompt":"White to move: launch the kingside attack","answer":"Bg5","hint":"Pin the knight and increase pressure"},
+             ]},
+            {"name":"King's Gambit","moves":"e4 e5 f4 exf4 Nf3","pgn":"1.e4 e5 2.f4 exf4 3.Nf3","difficulty":"Intermediate","players":"Tal, Morphy, Spassky","why":"Sacrifices a pawn immediately for a blazing kingside attack","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Kings-Gambit-Accepted",
+             "puzzles":[
+               {"fen":"rnbqkbnr/pppp1ppp/8/8/4Pp2/5N2/PPPP2PP/RNBQKB1R b KQkq - 1 3","prompt":"Black to move: how do you hold the extra pawn?","answer":"g5","hint":"Protect the f4 pawn aggressively"},
+               {"fen":"rnbqkbnr/pppp1p1p/8/6p1/4Pp2/5N2/PPPP2PP/RNBQKB1R w KQkq g6 0 4","prompt":"White to move: exploit Black's weakened kingside","answer":"h4","hint":"Attack the g5 pawn immediately"},
+               {"fen":"rnbqk1nr/pppp1pbp/6p1/8/2B1PpP1/5N2/PPPP3P/RNBQK2R b KQkq - 1 6","prompt":"Black to move: best defensive resource","answer":"h6","hint":"Prevent Ng5 threats"},
+             ]},
+            {"name":"Vienna Game","moves":"e4 e5 Nc3 Nf6 Bc4","pgn":"1.e4 e5 2.Nc3 Nf6 3.Bc4","difficulty":"Intermediate","players":"Spielmann, Morozevich","why":"Flexible and aggressive — transposes into many sharp tactical lines","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Vienna-Game",
+             "puzzles":[
+               {"fen":"r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/2N5/PPPP1PPP/R1BQK1NR w KQkq - 4 4","prompt":"White to move: what is the most aggressive plan?","answer":"d3","hint":"Solidify the center and prepare Bg5"},
+               {"fen":"r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R b KQkq - 5 4","prompt":"Black to move: how to fight for equality?","answer":"Bc5","hint":"Develop and mirror White's bishop"},
+               {"fen":"r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 2 5","prompt":"White to move: start the attack","answer":"Ng5","hint":"Threaten f7 immediately"},
+             ]},
+            {"name":"Sicilian Defense: Dragon","moves":"e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 g6","pgn":"1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 g6","difficulty":"Advanced","players":"Karjakin, Topalov","why":"Double-edged race — you attack the kingside while White goes queenside","elo_min":800,
+             "chesscom":"https://www.chess.com/openings/Sicilian-Defense-Dragon-Variation",
+             "puzzles":[
+               {"fen":"r1bqkb1r/pp2pp1p/2np1np1/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 7","prompt":"White to move: set up the Yugoslav Attack","answer":"Be3","hint":"Prepare queenside castling and a kingside pawn storm"},
+               {"fen":"r1bq1rk1/pp2ppbp/2np1np1/8/3NP3/2N1B3/PPP1BPPP/R2QK2R w KQ - 4 9","prompt":"White to move: launch the assault","answer":"f4","hint":"Start the pawn storm before Black attacks on the queenside"},
+               {"fen":"r1bq1rk1/pp3pbp/2np1np1/4p3/3NP3/2N1B3/PPPQBPPP/R4RK1 b - - 1 11","prompt":"Black to move: counterattack on the queenside","answer":"a5","hint":"Advance the queenside pawns to create counterplay"},
+             ]},
+            {"name":"Latvian Gambit","moves":"e4 e5 Nf3 f5","pgn":"1.e4 e5 2.Nf3 f5","difficulty":"Intermediate","players":"Shirov (fan)","why":"Wild and chaotic — perfect for players who love to surprise opponents early","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Latvian-Gambit",
+             "puzzles":[
+               {"fen":"rnbqkbnr/pppp2pp/8/4pp2/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq f6 0 3","prompt":"White to move: how to best challenge Black's gambit?","answer":"Nxe5","hint":"Take the central pawn immediately"},
+               {"fen":"rnbqkbnr/pppp2pp/8/4pN2/4P3/8/PPPP1PPP/RNBQKB1R b KQkq - 0 3","prompt":"Black to move: maintain the attack","answer":"Qf6","hint":"Attack the knight and support the f5 pawn"},
+               {"fen":"rnb1kbnr/pppp2pp/5q2/4pN2/4P3/8/PPPP1PPP/RNBQKB1R w KQkq - 1 4","prompt":"White to move: defend and keep the advantage","answer":"d4","hint":"Open the center and challenge Black"},
+             ]},
+            {"name":"Alekhine's Defense","moves":"e4 Nf6 e5 Nd5 d4 d6","pgn":"1.e4 Nf6 2.e5 Nd5 3.d4 d6","difficulty":"Intermediate","players":"Alekhine, Bagirov","why":"Provokes White's pawns to overextend, then attacks them as weaknesses","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Alekhines-Defense",
+             "puzzles":[
+               {"fen":"rnbqkb1r/ppp1pppp/3p4/3nP3/3P4/8/PPP2PPP/RNBQKBNR w KQkq - 0 4","prompt":"White to move: how to support the e5 pawn?","answer":"c4","hint":"Chase the knight and build a big pawn center"},
+               {"fen":"rnbqkb1r/ppp1pppp/3p4/4P3/2Pn4/8/PP3PPP/RNBQKBNR w KQkq - 1 5","prompt":"White to move: deal with the knight on d4","answer":"Be3","hint":"Attack the knight with a developing move"},
+               {"fen":"rnbqkb1r/pp2pppp/3p4/4P3/2p5/4B3/PP3PPP/RN1QKBNR b KQkq - 1 6","prompt":"Black to move: undermine White's center","answer":"dxe5","hint":"Strike the overextended pawns"},
+             ]},
+            {"name":"Budapest Gambit","moves":"d4 Nf6 c4 e5 dxe5 Ng4","pgn":"1.d4 Nf6 2.c4 e5 3.dxe5 Ng4","difficulty":"Intermediate","players":"Rubinstein, Spielmann","why":"An early gambit that leads to wild positions — great shock value in blitz","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Budapest-Gambit",
+             "puzzles":[
+               {"fen":"rnbqkb1r/pppp1ppp/8/4P3/2P3n1/8/PP2PPPP/RNBQKBNR w KQkq - 1 4","prompt":"White to move: how to hold the extra pawn?","answer":"Nf3","hint":"Defend e5 with a developing move"},
+               {"fen":"rnbqkb1r/pppp1ppp/8/4P3/2P3n1/5N2/PP2PPPP/RNBQKB1R b KQkq - 2 4","prompt":"Black to move: regain the pawn","answer":"Bc5","hint":"Develop and attack f2"},
+               {"fen":"rnbqk2r/pppp1ppp/8/2b1P3/2P3n1/5N2/PP2PPPP/RNBQKB1R w KQkq - 3 5","prompt":"White to move: defend against Nxf2","answer":"e3","hint":"Shore up the f2 pawn and kick the bishop"},
+             ]},
+            {"name":"Scotch Gambit","moves":"e4 e5 Nf3 Nc6 d4 exd4 Bc4","pgn":"1.e4 e5 2.Nf3 Nc6 3.d4 exd4 4.Bc4","difficulty":"Intermediate","players":"Morphy, Kasparov","why":"Fast development with piece activity — leads to open tactical battles","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Scotch-Gambit",
+             "puzzles":[
+               {"fen":"r1bqkbnr/pppp1ppp/2n5/8/2BpP3/5N2/PPP2PPP/RNBQK2R b KQkq - 1 4","prompt":"Black to move: the critical decision","answer":"Bc5","hint":"Develop the bishop and put pressure on f2"},
+               {"fen":"r1bqk1nr/pppp1ppp/2n5/2b5/2BpP3/5N2/PPP2PPP/RNBQ1RK1 b kq - 3 5","prompt":"Black to move: attack the center","answer":"Nf6","hint":"Develop and attack e4"},
+               {"fen":"r1bqk2r/pppp1ppp/2n2n2/2b5/2BpP3/2P2N2/PP3PPP/RNBQ1RK1 b kq - 0 6","prompt":"Black to move: castle and solidify","answer":"O-O","hint":"Get the king safe before complications arise"},
+             ]},
         ]
     },
     "Classical": {
@@ -41,14 +91,62 @@ OPENING_DB = {
         "description":"You follow sound principles — develop pieces, control the center, castle early.",
         "tip":"Study endgames — classical players convert small advantages in long games.",
         "openings":[
-            {"name":"Ruy Lopez (Spanish Opening)","moves":"e4 e5 Nf3 Nc6 Bb5","pgn":"1.e4 e5 2.Nf3 Nc6 3.Bb5","difficulty":"Intermediate","players":"Karpov, Capablanca, Fischer","why":"The most classical opening — puts long-term pressure on the e5 pawn","elo_min":0},
-            {"name":"Italian Game: Giuoco Piano","moves":"e4 e5 Nf3 Nc6 Bc4 Bc5 c3","pgn":"1.e4 e5 2.Nf3 Nc6 3.Bc4 Bc5 4.c3","difficulty":"Beginner","players":"Carlsen, Greco","why":"Perfect for learning classical principles — simple, sound, and effective","elo_min":0},
-            {"name":"Four Knights Game","moves":"e4 e5 Nf3 Nc6 Nc3 Nf6","pgn":"1.e4 e5 2.Nf3 Nc6 3.Nc3 Nf6","difficulty":"Beginner","players":"Rubinstein, Marshall","why":"Symmetrical principled development — great for building opening fundamentals","elo_min":0},
-            {"name":"Petrov's Defense","moves":"e4 e5 Nf3 Nf6 Nxe5 d6 Nf3 Nxe4","pgn":"1.e4 e5 2.Nf3 Nf6 3.Nxe5 d6 4.Nf3 Nxe4","difficulty":"Intermediate","players":"Kramnik, Anand","why":"Ultra-solid reply — difficult to lose but requires precision to win","elo_min":0},
-            {"name":"Ruy Lopez: Berlin Defense","moves":"e4 e5 Nf3 Nc6 Bb5 Nf6","pgn":"1.e4 e5 2.Nf3 Nc6 3.Bb5 Nf6","difficulty":"Advanced","players":"Kramnik, Carlsen","why":"The 'Berlin Wall' — endgame-focused and extremely hard to crack","elo_min":1000},
-            {"name":"Scotch Game","moves":"e4 e5 Nf3 Nc6 d4 exd4 Nxd4","pgn":"1.e4 e5 2.Nf3 Nc6 3.d4 exd4 4.Nxd4","difficulty":"Intermediate","players":"Kasparov, Carlsen","why":"Opens the center early — leads to rich tactical and positional play","elo_min":0},
-            {"name":"Bishop's Opening","moves":"e4 e5 Bc4","pgn":"1.e4 e5 2.Bc4","difficulty":"Beginner","players":"Greco, Fischer","why":"Simple and principled — targets f7 immediately and keeps options flexible","elo_min":0},
-            {"name":"Three Knights Game","moves":"e4 e5 Nf3 Nc6 Nc3","pgn":"1.e4 e5 2.Nf3 Nc6 3.Nc3","difficulty":"Beginner","players":"Spassky","why":"Rapid development with options to steer into sharp or solid lines","elo_min":0},
+            {"name":"Ruy Lopez (Spanish Opening)","moves":"e4 e5 Nf3 Nc6 Bb5","pgn":"1.e4 e5 2.Nf3 Nc6 3.Bb5","difficulty":"Intermediate","players":"Karpov, Capablanca, Fischer","why":"The most classical opening — puts long-term pressure on the e5 pawn","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Ruy-Lopez-Opening",
+             "puzzles":[
+               {"fen":"r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3","prompt":"Black to move: the most principled reply to Bb5","answer":"a6","hint":"Challenge the bishop immediately — the Morphy Defense"},
+               {"fen":"r1bqkbnr/1ppp1ppp/p1n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4","prompt":"White to move: should the bishop retreat or capture?","answer":"Ba4","hint":"Maintain the pin on the knight — don't exchange yet"},
+               {"fen":"r1bqkb1r/1ppp1ppp/p1n2n2/4p3/B3P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 2 5","prompt":"White to move: complete development","answer":"O-O","hint":"Castle and prepare to fight for the center"},
+             ]},
+            {"name":"Italian Game: Giuoco Piano","moves":"e4 e5 Nf3 Nc6 Bc4 Bc5 c3","pgn":"1.e4 e5 2.Nf3 Nc6 3.Bc4 Bc5 4.c3","difficulty":"Beginner","players":"Carlsen, Greco","why":"Perfect for learning classical principles — simple, sound, and effective","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Italian-Game-Giuoco-Piano",
+             "puzzles":[
+               {"fen":"r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/2P2N2/PP1P1PPP/RNBQK2R b KQkq - 0 4","prompt":"Black to move: the most natural development","answer":"Nf6","hint":"Develop the knight and attack e4"},
+               {"fen":"r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2P2N2/PP1P1PPP/RNBQ1RK1 b kq - 2 5","prompt":"Black to move: mirror White's plan","answer":"O-O","hint":"Castle and keep the position solid"},
+               {"fen":"r1bq1rk1/pppp1ppp/2n2n2/2b1p3/2B1P3/2PP1N2/PP3PPP/RNBQ1RK1 b - - 0 6","prompt":"Black to move: fight for the center","answer":"d6","hint":"Solidify the e5 pawn and prepare Be6"},
+             ]},
+            {"name":"Four Knights Game","moves":"e4 e5 Nf3 Nc6 Nc3 Nf6","pgn":"1.e4 e5 2.Nf3 Nc6 3.Nc3 Nf6","difficulty":"Beginner","players":"Rubinstein, Marshall","why":"Symmetrical principled development — great for building opening fundamentals","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Four-Knights-Game",
+             "puzzles":[
+               {"fen":"r1bqkb1r/pppp1ppp/2n2n2/4p3/4P3/2N2N2/PPPP1PPP/R1BQKB1R w KQkq - 4 4","prompt":"White to move: best principled 4th move","answer":"Bb5","hint":"The Spanish Four Knights — pin the knight"},
+               {"fen":"r1bqkb1r/pppp1ppp/2n2n2/1B2p3/4P3/2N2N2/PPPP1PPP/R1BQK2R b KQkq - 5 4","prompt":"Black to move: mirror and challenge","answer":"Bb4","hint":"Pin White's knight back — the symmetrical variation"},
+               {"fen":"r1bqk2r/pppp1ppp/2n2n2/4p3/1b2P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 6 5","prompt":"White to move: break the symmetry","answer":"O-O","hint":"Castle and prepare d4"},
+             ]},
+            {"name":"Petrov's Defense","moves":"e4 e5 Nf3 Nf6 Nxe5 d6 Nf3 Nxe4","pgn":"1.e4 e5 2.Nf3 Nf6 3.Nxe5 d6 4.Nf3 Nxe4","difficulty":"Intermediate","players":"Kramnik, Anand","why":"Ultra-solid reply — difficult to lose but requires precision to win","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Petrovs-Defense",
+             "puzzles":[
+               {"fen":"rnbqkb1r/pppp1ppp/5n2/4N3/4P3/8/PPPP1PPP/RNBQKB1R b KQkq - 2 3","prompt":"Black to move: the key Petrov move","answer":"d6","hint":"Attack the knight and recapture — don't take e4 immediately"},
+               {"fen":"rnbqkb1r/ppp2ppp/3p4/4N3/4n3/8/PPPP1PPP/RNBQKB1R w KQkq - 0 5","prompt":"White to move: win the knight back safely","answer":"d3","hint":"Attack the e4 knight and develop"},
+               {"fen":"rnbqkb1r/ppp2ppp/3p4/8/4n3/3P4/PPP2PPP/RNBQKB1R b KQkq - 0 6","prompt":"Black to move: regroup","answer":"Nf6","hint":"The knight must retreat to a safe square"},
+             ]},
+            {"name":"Ruy Lopez: Berlin Defense","moves":"e4 e5 Nf3 Nc6 Bb5 Nf6","pgn":"1.e4 e5 2.Nf3 Nc6 3.Bb5 Nf6","difficulty":"Advanced","players":"Kramnik, Carlsen","why":"The 'Berlin Wall' — endgame-focused and extremely hard to crack","elo_min":1000,
+             "chesscom":"https://www.chess.com/openings/Ruy-Lopez-Opening-Berlin-Defense",
+             "puzzles":[
+               {"fen":"r1bqkb1r/pppp1ppp/2n2n2/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4","prompt":"White to move: enter the Berlin endgame","answer":"O-O","hint":"Castle — the Berlin endgame is coming"},
+               {"fen":"r1bqkb1r/pppp1ppp/2n2n2/1B2p3/4P3/5N2/PPPP1PPP/RNBQ1RK1 b kq - 5 4","prompt":"Black to move: the Berlin endgame idea","answer":"Nxe4","hint":"Take the pawn — the endgame after Bxc6 dxc6 Nxe5 is approximately equal"},
+               {"fen":"r1bqkb1r/pppp1ppp/2p2n2/4n3/4P3/5N2/PPPP1PPP/RNBQ1RK1 w kq - 0 6","prompt":"White to move: win material","answer":"Re1","hint":"Pin the knight on e5"},
+             ]},
+            {"name":"Scotch Game","moves":"e4 e5 Nf3 Nc6 d4 exd4 Nxd4","pgn":"1.e4 e5 2.Nf3 Nc6 3.d4 exd4 4.Nxd4","difficulty":"Intermediate","players":"Kasparov, Carlsen","why":"Opens the center early — leads to rich tactical and positional play","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Scotch-Game",
+             "puzzles":[
+               {"fen":"r1bqkbnr/pppp1ppp/2n5/8/3NP3/8/PPP2PPP/RNBQKB1R b KQkq - 0 4","prompt":"Black to move: fight for equality","answer":"Bc5","hint":"Develop the bishop and pressure the d4 knight"},
+               {"fen":"r1bqk1nr/pppp1ppp/2n5/2b5/3NP3/8/PPP2PPP/RNBQKB1R w KQkq - 1 5","prompt":"White to move: the critical choice","answer":"Be3","hint":"Defend the knight and prepare c3"},
+               {"fen":"r1bqk1nr/pppp1ppp/2n5/2b5/3NP3/4B3/PPP2PPP/RN1QKB1R b KQkq - 2 5","prompt":"Black to move: maintain the tension","answer":"Qf6","hint":"Attack e5 and keep the bishop on c5"},
+             ]},
+            {"name":"Bishop's Opening","moves":"e4 e5 Bc4","pgn":"1.e4 e5 2.Bc4","difficulty":"Beginner","players":"Greco, Fischer","why":"Simple and principled — targets f7 immediately and keeps options flexible","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Bishops-Opening",
+             "puzzles":[
+               {"fen":"rnbqkbnr/pppp1ppp/8/4p3/2B1P3/8/PPPP1PPP/RNBQK1NR b KQkq - 1 2","prompt":"Black to move: most natural reply","answer":"Nf6","hint":"Develop and attack e4"},
+               {"fen":"rnbqkb1r/pppp1ppp/5n2/4p3/2B1P3/2N5/PPPP1PPP/R1BQK1NR b KQkq - 3 3","prompt":"Black to move: mirror and challenge","answer":"Bc5","hint":"Develop the bishop symmetrically"},
+               {"fen":"rnbqk2r/pppp1ppp/5n2/2b1p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R b KQkq - 5 4","prompt":"Black to move: complete development","answer":"O-O","hint":"Castle and prepare for the middlegame"},
+             ]},
+            {"name":"Three Knights Game","moves":"e4 e5 Nf3 Nc6 Nc3","pgn":"1.e4 e5 2.Nf3 Nc6 3.Nc3","difficulty":"Beginner","players":"Spassky","why":"Rapid development with options to steer into sharp or solid lines","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Three-Knights-Opening",
+             "puzzles":[
+               {"fen":"r1bqkbnr/pppp1ppp/2n5/4p3/4P3/2N2N2/PPPP1PPP/R1BQKB1R b KQkq - 3 3","prompt":"Black to move: best developing move","answer":"Nf6","hint":"Complete the symmetry — develop and attack e4"},
+               {"fen":"r1bqkb1r/pppp1ppp/2n2n2/4p3/4P3/2N2N2/PPPP1PPP/R1BQKB1R w KQkq - 4 4","prompt":"White to move: choose your setup","answer":"Bb5","hint":"Play the Spanish setup — pin the knight"},
+               {"fen":"r1bqkb1r/pppp1ppp/2n2n2/1B2p3/4P3/2N2N2/PPPP1PPP/R1BQK2R b KQkq - 5 4","prompt":"Black to move: challenge the bishop","answer":"Nd4","hint":"Fork the bishop and f3 knight"},
+             ]},
         ]
     },
     "Strategic": {
@@ -56,14 +154,62 @@ OPENING_DB = {
         "description":"You think long-term. Pawn structures and slow accumulation of advantages define your game.",
         "tip":"Study pawn structures — strategic players win by knowing which breaks to make.",
         "openings":[
-            {"name":"Queen's Gambit Declined","moves":"d4 d5 c4 e6 Nc3 Nf6","pgn":"1.d4 d5 2.c4 e6 3.Nc3 Nf6","difficulty":"Intermediate","players":"Karpov, Kramnik, Carlsen","why":"Solid structure with rich positional play and long-term pressure","elo_min":0},
-            {"name":"King's Indian Defense","moves":"d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3","pgn":"1.d4 Nf6 2.c4 g6 3.Nc3 Bg7 4.e4 d6 5.Nf3","difficulty":"Advanced","players":"Fischer, Kasparov","why":"Lets White take the center, then launches a fierce counterattack","elo_min":800},
-            {"name":"English Opening","moves":"c4 e5 Nc3 Nf6 Nf3","pgn":"1.c4 e5 2.Nc3 Nf6 3.Nf3","difficulty":"Intermediate","players":"Karpov, Botvinnik","why":"Flexible hypermodern — delays the center fight for strategic maneuvering","elo_min":0},
-            {"name":"Nimzo-Indian Defense","moves":"d4 Nf6 c4 e6 Nc3 Bb4","pgn":"1.d4 Nf6 2.c4 e6 3.Nc3 Bb4","difficulty":"Intermediate","players":"Nimzowitsch, Kasparov, Karpov","why":"Controls the center with pieces rather than pawns — rich strategic battles","elo_min":0},
-            {"name":"Catalan Opening","moves":"d4 Nf6 c4 e6 g3 d5 Bg2","pgn":"1.d4 Nf6 2.c4 e6 3.g3 d5 4.Bg2","difficulty":"Advanced","players":"Kramnik, Carlsen","why":"Long-term pressure down the c-file and d-diagonal — positional masterclass","elo_min":1000},
-            {"name":"Reti Opening","moves":"Nf3 d5 c4","pgn":"1.Nf3 d5 2.c4","difficulty":"Intermediate","players":"Reti, Karpov","why":"Hypermodern — attacks the center from the flanks with pieces, not pawns","elo_min":0},
-            {"name":"London System","moves":"d4 d5 Nf3 Nf6 Bf4 e6 e3","pgn":"1.d4 d5 2.Nf3 Nf6 3.Bf4 e6 4.e3","difficulty":"Beginner","players":"Carlsen, Giri","why":"Simple, solid setup that avoids heavy theory — grind opponents down slowly","elo_min":0},
-            {"name":"Queen's Gambit Accepted","moves":"d4 d5 c4 dxc4 Nf3 Nf6","pgn":"1.d4 d5 2.c4 dxc4 3.Nf3 Nf6","difficulty":"Intermediate","players":"Anand, Spassky","why":"Taking the gambit pawn leads to active piece play and open positions","elo_min":0},
+            {"name":"Queen's Gambit Declined","moves":"d4 d5 c4 e6 Nc3 Nf6","pgn":"1.d4 d5 2.c4 e6 3.Nc3 Nf6","difficulty":"Intermediate","players":"Karpov, Kramnik, Carlsen","why":"Solid structure with rich positional play and long-term pressure","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Queens-Gambit-Declined",
+             "puzzles":[
+               {"fen":"rnbqkb1r/ppp2ppp/4pn2/3p4/2PP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4","prompt":"White to move: best plan in the QGD","answer":"Bg5","hint":"Pin the knight and create long-term pressure"},
+               {"fen":"rnbqk2r/ppp1bppp/4pn2/3p2B1/2PP4/2N5/PP2PPPP/R2QKBNR w KQkq - 4 5","prompt":"White to move: fight for the center","answer":"e3","hint":"Solidify the center and prepare Bd3"},
+               {"fen":"rnbq1rk1/ppp1bppp/4pn2/3p4/2PP4/2N1PN2/PP3PPP/R2QKB1R w KQ - 4 7","prompt":"White to move: the Exchange variation","answer":"cxd5","hint":"Release the tension and play for a structural advantage"},
+             ]},
+            {"name":"King's Indian Defense","moves":"d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3","pgn":"1.d4 Nf6 2.c4 g6 3.Nc3 Bg7 4.e4 d6 5.Nf3","difficulty":"Advanced","players":"Fischer, Kasparov","why":"Lets White take the center, then launches a fierce counterattack","elo_min":800,
+             "chesscom":"https://www.chess.com/openings/Kings-Indian-Defense",
+             "puzzles":[
+               {"fen":"rnbqk2r/ppp1ppbp/3p1np1/8/2PPP3/2N2N2/PP3PPP/R1BQKB1R b KQkq - 0 6","prompt":"Black to move: the critical KID move","answer":"O-O","hint":"Castle and prepare the counterattack with e5"},
+               {"fen":"rnbq1rk1/ppp1ppbp/3p1np1/8/2PPP3/2N2N2/PP3PPP/R1BQKB1R w KQ - 1 7","prompt":"White to move: set up the classical main line","answer":"Be2","hint":"Develop and prepare to castle"},
+               {"fen":"rnbq1rk1/ppp2pbp/3p1np1/4p3/2PPP3/2N2N2/PP2BPPP/R1BQK2R w KQ - 0 8","prompt":"White to move: fight for the center","answer":"O-O","hint":"Castle and then play d5 or dxe5"},
+             ]},
+            {"name":"English Opening","moves":"c4 e5 Nc3 Nf6 Nf3","pgn":"1.c4 e5 2.Nc3 Nf6 3.Nf3","difficulty":"Intermediate","players":"Karpov, Botvinnik","why":"Flexible hypermodern — delays the center fight for strategic maneuvering","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/English-Opening",
+             "puzzles":[
+               {"fen":"rnbqkb1r/pppp1ppp/5n2/4p3/2P5/2N5/PP1PPPPP/R1BQKBNR w KQkq - 2 3","prompt":"White to move: develop flexibly","answer":"Nf3","hint":"Develop the knight and keep options open"},
+               {"fen":"rnbqkb1r/pppp1ppp/5n2/4p3/2P5/2N2N2/PP1PPPPP/R1BQKB1R b KQkq - 3 3","prompt":"Black to move: challenge or develop?","answer":"Nc6","hint":"Develop and support the e5 pawn"},
+               {"fen":"r1bqkb1r/pppp1ppp/2n2n2/4p3/2P5/2N2N2/PP1PPPPP/R1BQKB1R w KQkq - 4 4","prompt":"White to move: fight for d5","answer":"d4","hint":"Strike in the center"},
+             ]},
+            {"name":"Nimzo-Indian Defense","moves":"d4 Nf6 c4 e6 Nc3 Bb4","pgn":"1.d4 Nf6 2.c4 e6 3.Nc3 Bb4","difficulty":"Intermediate","players":"Nimzowitsch, Kasparov, Karpov","why":"Controls the center with pieces rather than pawns — rich strategic battles","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Nimzo-Indian-Defense",
+             "puzzles":[
+               {"fen":"rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4","prompt":"White to move: choose your Nimzo system","answer":"Qc2","hint":"The classical system — prevent doubling and keep the bishop pair"},
+               {"fen":"rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PPQ1PPPP/R1B1KBNR b KQkq - 3 4","prompt":"Black to move: take the pawn or retreat?","answer":"O-O","hint":"Castle first — the bishop will come back"},
+               {"fen":"rnbq1rk1/pppp1ppp/4pn2/8/1bPP4/2N1P3/PPQ2PPP/R1B1KBNR w KQ - 2 5","prompt":"White to move: fight for d4","answer":"Bd2","hint":"Develop and protect d4 against Bxc3"},
+             ]},
+            {"name":"Catalan Opening","moves":"d4 Nf6 c4 e6 g3 d5 Bg2","pgn":"1.d4 Nf6 2.c4 e6 3.g3 d5 4.Bg2","difficulty":"Advanced","players":"Kramnik, Carlsen","why":"Long-term pressure down the c-file and d-diagonal — positional masterclass","elo_min":1000,
+             "chesscom":"https://www.chess.com/openings/Catalan-Opening",
+             "puzzles":[
+               {"fen":"rnbqkb1r/ppp2ppp/4pn2/3p4/2PP4/6P1/PP2PP1P/RNBQKBNR w KQkq - 0 4","prompt":"White to move: fianchetto the bishop","answer":"Bg2","hint":"Complete the Catalan setup — the bishop on g2 is the key piece"},
+               {"fen":"rnbqkb1r/ppp2ppp/4pn2/3p4/2PP4/6P1/PP2PPBP/RNBQK1NR b KQkq - 1 4","prompt":"Black to move: take the gambit pawn?","answer":"dxc4","hint":"The Open Catalan — take the pawn and try to hold it"},
+               {"fen":"rnbqkb1r/ppp2ppp/4pn2/8/2pP4/6P1/PP2PPBP/RNBQK1NR w KQkq - 0 5","prompt":"White to move: regain the pawn or build pressure?","answer":"Nf3","hint":"Develop first — the c4 pawn will be recovered with Qa4 or Ne5"},
+             ]},
+            {"name":"Reti Opening","moves":"Nf3 d5 c4","pgn":"1.Nf3 d5 2.c4","difficulty":"Intermediate","players":"Reti, Karpov","why":"Hypermodern — attacks the center from the flanks with pieces, not pawns","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Reti-Opening",
+             "puzzles":[
+               {"fen":"rnbqkbnr/ppp1pppp/8/3p4/2P5/5N2/PP1PPPPP/RNBQKB1R b KQkq - 0 2","prompt":"Black to move: defend or advance?","answer":"d4","hint":"The aggressive pawn advance — gain space in the center"},
+               {"fen":"rnbqkbnr/ppp1pppp/8/8/2Pp4/5N2/PP1PPPPP/RNBQKB1R w KQkq - 0 3","prompt":"White to move: best response to d4","answer":"e3","hint":"Challenge the pawn and open lines for your pieces"},
+               {"fen":"rnbqkbnr/ppp1pppp/8/8/2P5/4pN2/PP1P1PPP/RNBQKB1R w KQkq - 0 4","prompt":"White to move: what if Black promotes the pawn?","answer":"Nxe3","hint":"Recapture and maintain material balance"},
+             ]},
+            {"name":"London System","moves":"d4 d5 Nf3 Nf6 Bf4 e6 e3","pgn":"1.d4 d5 2.Nf3 Nf6 3.Bf4 e6 4.e3","difficulty":"Beginner","players":"Carlsen, Giri","why":"Simple, solid setup that avoids heavy theory — grind opponents down slowly","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/London-System",
+             "puzzles":[
+               {"fen":"rnbqkb1r/ppp2ppp/4pn2/3p4/3P1B2/5N2/PPP1PPPP/RN1QKB1R w KQkq - 2 4","prompt":"White to move: solidify the London setup","answer":"e3","hint":"Protect the bishop and prepare Bd3"},
+               {"fen":"rnbqkb1r/ppp2ppp/4pn2/3p4/3P1B2/4PN2/PPP2PPP/RN1QKB1R b KQkq - 0 4","prompt":"Black to move: challenge the London","answer":"c5","hint":"Strike at the d4 base immediately"},
+               {"fen":"rnbqkb1r/pp3ppp/4pn2/2pp4/3P1B2/4PN2/PPP2PPP/RN1QKB1R w KQkq - 0 5","prompt":"White to move: maintain control","answer":"c3","hint":"Solidify d4 and prepare to develop the queen's knight"},
+             ]},
+            {"name":"Queen's Gambit Accepted","moves":"d4 d5 c4 dxc4 Nf3 Nf6","pgn":"1.d4 d5 2.c4 dxc4 3.Nf3 Nf6","difficulty":"Intermediate","players":"Anand, Spassky","why":"Taking the gambit pawn leads to active piece play and open positions","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Queens-Gambit-Accepted",
+             "puzzles":[
+               {"fen":"rnbqkb1r/ppp1pppp/5n2/8/2pP4/5N2/PP2PPPP/RNBQKB1R w KQkq - 2 4","prompt":"White to move: win back the pawn","answer":"e3","hint":"Prepare Bxc4 — develop the bishop and fight for the c4 pawn"},
+               {"fen":"rnbqkb1r/ppp1pppp/5n2/8/2pP4/4PN2/PP3PPP/RNBQKB1R b KQkq - 0 4","prompt":"Black to move: hold the extra pawn?","answer":"e6","hint":"Consolidate and prepare to develop — it's hard to hold c4 long term"},
+               {"fen":"rnbqkb1r/ppp2ppp/4pn2/8/2pP4/4PN2/PP3PPP/RNBQKB1R w KQkq - 0 5","prompt":"White to move: recapture the pawn","answer":"Bxc4","hint":"Recover the pawn and develop with tempo"},
+             ]},
         ]
     },
     "Solid": {
@@ -71,14 +217,62 @@ OPENING_DB = {
         "description":"You value safety and reliability. You avoid complications and build from a secure foundation.",
         "tip":"Work on converting small advantages — solid players win by slowly outplaying opponents.",
         "openings":[
-            {"name":"Caro-Kann Defense","moves":"e4 c6 d4 d5 Nc3 dxe4 Nxe4","pgn":"1.e4 c6 2.d4 d5 3.Nc3 dxe4 4.Nxe4","difficulty":"Intermediate","players":"Petrosian, Karpov, Anand","why":"Rock-solid structure — avoids early complications without being passive","elo_min":0},
-            {"name":"French Defense","moves":"e4 e6 d4 d5 Nc3 Nf6","pgn":"1.e4 e6 2.d4 d5 3.Nc3 Nf6","difficulty":"Intermediate","players":"Nimzowitsch, Uhlmann","why":"Creates a solid pawn chain and leads to rich strategic battles","elo_min":0},
-            {"name":"Slav Defense","moves":"d4 d5 c4 c6 Nf3 Nf6 Nc3","pgn":"1.d4 d5 2.c4 c6 3.Nf3 Nf6 4.Nc3","difficulty":"Intermediate","players":"Kramnik, Anand","why":"Extremely reliable against the Queen's Gambit — solid with counterplay","elo_min":0},
-            {"name":"Scandinavian Defense","moves":"e4 d5 exd5 Qxd5 Nc3 Qa5","pgn":"1.e4 d5 2.exd5 Qxd5 3.Nc3 Qa5","difficulty":"Beginner","players":"Tiviakov, Carlsen (occasional)","why":"Immediate central challenge — simple and easy to learn for all levels","elo_min":0},
-            {"name":"Semi-Slav Defense","moves":"d4 d5 c4 c6 Nf3 Nf6 Nc3 e6","pgn":"1.d4 d5 2.c4 c6 3.Nf3 Nf6 4.Nc3 e6","difficulty":"Advanced","players":"Anand, Topalov","why":"One of the most theoretically rich defenses — solid yet full of counterplay","elo_min":800},
-            {"name":"King's Indian Attack","moves":"Nf3 d5 g3 Nf6 Bg2 e6 O-O","pgn":"1.Nf3 d5 2.g3 Nf6 3.Bg2 e6 4.O-O","difficulty":"Intermediate","players":"Fischer, Karpov","why":"White sets up a safe king and waits for the right moment to strike","elo_min":0},
-            {"name":"Dutch Defense: Stonewall","moves":"d4 f5 c4 Nf6 g3 e6 Bg2 d5","pgn":"1.d4 f5 2.c4 Nf6 3.g3 e6 4.Bg2 d5","difficulty":"Intermediate","players":"Botvinnik, Short","why":"A fortress structure — difficult to break down, ideal for patient players","elo_min":0},
-            {"name":"Caro-Kann: Classical","moves":"e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5","pgn":"1.e4 c6 2.d4 d5 3.Nc3 dxe4 4.Nxe4 Bf5","difficulty":"Intermediate","players":"Karpov, Leko","why":"Keeps the light-squared bishop active — a refined, solid approach","elo_min":0},
+            {"name":"Caro-Kann Defense","moves":"e4 c6 d4 d5 Nc3 dxe4 Nxe4","pgn":"1.e4 c6 2.d4 d5 3.Nc3 dxe4 4.Nxe4","difficulty":"Intermediate","players":"Petrosian, Karpov, Anand","why":"Rock-solid structure — avoids early complications without being passive","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Caro-Kann-Defense",
+             "puzzles":[
+               {"fen":"rnbqkbnr/pp2pppp/2p5/3p4/3PP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3","prompt":"White to move: most aggressive Caro-Kann response","answer":"Nc3","hint":"Develop and support the advance of e5"},
+               {"fen":"rnbqkbnr/pp2pppp/2p5/8/3Pn3/2N5/PPP2PPP/R1BQKBNR w KQkq - 1 4","prompt":"White to move: deal with the knight","answer":"Nf3","hint":"Develop and attack the e4 knight"},
+               {"fen":"rnbqkb1r/pp2pppp/2p2n2/8/3P4/2N2N2/PPP2PPP/R1BQKB1R b KQkq - 2 5","prompt":"Black to move: where does the bishop go?","answer":"Bf5","hint":"Develop actively outside the pawn chain — the trademark Caro-Kann move"},
+             ]},
+            {"name":"French Defense","moves":"e4 e6 d4 d5 Nc3 Nf6","pgn":"1.e4 e6 2.d4 d5 3.Nc3 Nf6","difficulty":"Intermediate","players":"Nimzowitsch, Uhlmann","why":"Creates a solid pawn chain and leads to rich strategic battles","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/French-Defense",
+             "puzzles":[
+               {"fen":"rnbqkbnr/ppp2ppp/4p3/3p4/3PP3/2N5/PPP2PPP/R1BQKBNR b KQkq - 1 3","prompt":"Black to move: fight for the center","answer":"Nf6","hint":"Develop and attack e4"},
+               {"fen":"rnbqkb1r/ppp2ppp/4pn2/3p4/3PP3/2N5/PPP2PPP/R1BQKBNR w KQkq - 2 4","prompt":"White to move: the critical decision","answer":"e5","hint":"Advance — the Advance Variation creates a space advantage"},
+               {"fen":"rnbqkb1r/ppp2ppp/4p3/3pPn2/3P4/2N5/PPP2PPP/R1BQKBNR w KQkq - 1 5","prompt":"White to move: challenge the strong f5 knight","answer":"Nce2","hint":"Support d4 and prepare to kick the knight with g4"},
+             ]},
+            {"name":"Slav Defense","moves":"d4 d5 c4 c6 Nf3 Nf6 Nc3","pgn":"1.d4 d5 2.c4 c6 3.Nf3 Nf6 4.Nc3","difficulty":"Intermediate","players":"Kramnik, Anand","why":"Extremely reliable against the Queen's Gambit — solid with counterplay","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Slav-Defense",
+             "puzzles":[
+               {"fen":"rnbqkb1r/pp2pppp/2p2n2/3p4/2PP4/2N2N2/PP2PPPP/R1BQKB1R b KQkq - 1 4","prompt":"Black to move: develop the light-squared bishop","answer":"Bf5","hint":"The classical Slav — the bishop escapes before e6 is played"},
+               {"fen":"rnbqkb1r/pp2pppp/2p2n2/3p4/2PP4/2N2N2/PP2PPPP/R1BQKB1R w KQkq - 1 4","prompt":"White to move: challenge the Slav structure","answer":"cxd5","hint":"Exchange pawns and fight for the c5 square"},
+               {"fen":"rnbqkb1r/pp2pppp/2p2n2/5B2/2PP4/2N2N2/PP2PPPP/R2QKB1R b KQkq - 1 5","prompt":"Black to move: deal with Bf5","answer":"cxd5","hint":"Recapture and free the position"},
+             ]},
+            {"name":"Scandinavian Defense","moves":"e4 d5 exd5 Qxd5 Nc3 Qa5","pgn":"1.e4 d5 2.exd5 Qxd5 3.Nc3 Qa5","difficulty":"Beginner","players":"Tiviakov, Carlsen (occasional)","why":"Immediate central challenge — simple and easy to learn for all levels","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Scandinavian-Defense",
+             "puzzles":[
+               {"fen":"rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2","prompt":"White to move: take the pawn","answer":"exd5","hint":"Accept the challenge in the center"},
+               {"fen":"rnbqkbnr/ppp1pppp/8/3Q4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3","prompt":"Black to move: bring the queen or recapture with the knight?","answer":"Qxd5","hint":"Take with the queen — the Scandinavian plan"},
+               {"fen":"rnb1kbnr/ppp1pppp/8/q7/8/2N5/PPPP1PPP/R1BQKBNR w KQkq - 2 4","prompt":"White to move: chase the queen","answer":"d4","hint":"Build the pawn center and gain tempo on the queen"},
+             ]},
+            {"name":"Semi-Slav Defense","moves":"d4 d5 c4 c6 Nf3 Nf6 Nc3 e6","pgn":"1.d4 d5 2.c4 c6 3.Nf3 Nf6 4.Nc3 e6","difficulty":"Advanced","players":"Anand, Topalov","why":"One of the most theoretically rich defenses — solid yet full of counterplay","elo_min":800,
+             "chesscom":"https://www.chess.com/openings/Semi-Slav-Defense",
+             "puzzles":[
+               {"fen":"rnbqkb1r/pp3ppp/2p1pn2/3p4/2PP4/2N2N2/PP2PPPP/R1BQKB1R w KQkq - 0 5","prompt":"White to move: enter the Meran or Anti-Meran","answer":"e3","hint":"The Meran — set up Be2 and castle"},
+               {"fen":"rnbqkb1r/pp3ppp/2p1pn2/3p4/2PP4/2N1PN2/PP3PPP/R1BQKB1R b KQkq - 0 5","prompt":"Black to move: the Meran counter","answer":"Nbd7","hint":"Develop the knight and prepare b5"},
+               {"fen":"rnbqkb1r/p4ppp/2p1pn2/1p1p4/2PP4/2N1PN2/PP3PPP/R1BQKB1R w KQkq b6 0 6","prompt":"White to move: fight for the center","answer":"cxd5","hint":"Exchange and then cxb5 — the main Meran line"},
+             ]},
+            {"name":"King's Indian Attack","moves":"Nf3 d5 g3 Nf6 Bg2 e6 O-O","pgn":"1.Nf3 d5 2.g3 Nf6 3.Bg2 e6 4.O-O","difficulty":"Intermediate","players":"Fischer, Karpov","why":"White sets up a safe king and waits for the right moment to strike","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Kings-Indian-Attack",
+             "puzzles":[
+               {"fen":"rnbqkb1r/ppp2ppp/4pn2/3p4/8/5NP1/PPPPPPBP/RNBQK2R w KQkq - 2 4","prompt":"White to move: complete the KIA setup","answer":"O-O","hint":"Castle and prepare d3 and Nbd2"},
+               {"fen":"rnbqkb1r/ppp2ppp/4pn2/3p4/8/5NP1/PPPPPPBP/RNBQ1RK1 b kq - 3 4","prompt":"Black to move: natural development","answer":"Be7","hint":"Develop and prepare to castle"},
+               {"fen":"rnbq1rk1/ppp1bppp/4pn2/3p4/8/3P1NP1/PPP1PPBP/RNBQ1RK1 w - - 4 6","prompt":"White to move: start the kingside plan","answer":"e4","hint":"Strike in the center — the KIA's main idea"},
+             ]},
+            {"name":"Dutch Defense: Stonewall","moves":"d4 f5 c4 Nf6 g3 e6 Bg2 d5","pgn":"1.d4 f5 2.c4 Nf6 3.g3 e6 4.Bg2 d5","difficulty":"Intermediate","players":"Botvinnik, Short","why":"A fortress structure — difficult to break down, ideal for patient players","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Dutch-Defense-Stonewall-Variation",
+             "puzzles":[
+               {"fen":"rnbqkb1r/ppppp1pp/5n2/5p2/2PP4/8/PP2PPPP/RNBQKBNR w KQkq - 2 3","prompt":"White to move: best against the Dutch","answer":"g3","hint":"Fianchetto the bishop — the strongest plan against the Dutch"},
+               {"fen":"rnbqkb1r/ppppp1pp/5n2/5p2/2PP4/6P1/PP2PP1P/RNBQKBNR b KQkq - 0 3","prompt":"Black to move: set up the Stonewall","answer":"e6","hint":"Play e6 before d5 to set up the Stonewall pawn structure"},
+               {"fen":"rnbqkb1r/ppp3pp/4pn2/3p1p2/2PP4/6P1/PP2PPBP/RNBQK1NR w KQkq - 0 5","prompt":"White to move: attack the Stonewall","answer":"Nf3","hint":"Develop and fight for the e5 square"},
+             ]},
+            {"name":"Caro-Kann: Classical","moves":"e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5","pgn":"1.e4 c6 2.d4 d5 3.Nc3 dxe4 4.Nxe4 Bf5","difficulty":"Intermediate","players":"Karpov, Leko","why":"Keeps the light-squared bishop active — a refined, solid approach","elo_min":0,
+             "chesscom":"https://www.chess.com/openings/Caro-Kann-Defense-Classical-Variation",
+             "puzzles":[
+               {"fen":"rnbqkbnr/pp2pppp/2p5/5b2/3PN3/8/PPP2PPP/R1BQKBNR w KQkq - 1 5","prompt":"White to move: most aggressive response to Bf5","answer":"Ng3","hint":"Attack the bishop and force it to commit"},
+               {"fen":"rnbqkbnr/pp2pppp/2p5/6b1/3P4/6N1/PPP2PPP/R1BQKBNR b KQkq - 2 5","prompt":"Black to move: best bishop retreat","answer":"Bg6","hint":"Retreat safely and keep the bishop active"},
+               {"fen":"rnbqkbnr/pp2pppp/2p3b1/8/3P4/6N1/PPP1PPPP/R1BQKBNR w KQkq - 3 6","prompt":"White to move: attack the g6 bishop","answer":"h4","hint":"Challenge the bishop with a flank pawn advance"},
+             ]},
         ]
     },
 }
@@ -209,12 +403,15 @@ def parse_pgn_games(pgn_text, username):
         moves_text=re.sub(r'^(\[.*?\]\s*)+','',game_str,flags=re.DOTALL).strip()
         moves=re.findall(r'\d+\.(?!\.\.)(?!\s*\.)',game_str)
         family=get_family_from_moves(moves_text) or get_opening_family(opening)
+        castled=1 if "O-O" in moves_text else 0
         records.append({"username":username,"player_elo":player_elo,"opponent_elo":opp_elo,
             "elo_diff":player_elo-opp_elo,"played_as_enc":1 if played_as=="white" else 0,
             "time_class":tc,"time_class_enc":{"bullet":0,"blitz":1,"rapid":2,"daily":3}.get(tc,1),
             "opening_name":opening or "","opening_family":family,"outcome":outcome,
             "num_moves":max(len(moves),1),"decisive":1 if outcome!="draw" else 0,
-            "resigned":1 if "resign" in term.lower() else 0})
+            "resigned":1 if "resign" in term.lower() else 0,
+            "castled":castled,
+            "is_bullet":1 if tc=="bullet" else 0})
     return records
 
 def fetch_all_games(usernames, months=2, progress_cb=None):
@@ -241,27 +438,49 @@ def fetch_all_games(usernames, months=2, progress_cb=None):
     return all_records
 
 FEATURES=["player_elo","opponent_elo","elo_diff","played_as_enc","time_class_enc",
-          "num_moves","decisive","resigned","win_rate","draw_rate","decisive_rate","resign_rate","aggression_score"]
+          "num_moves","decisive","resigned","win_rate","draw_rate","decisive_rate",
+          "resign_rate","aggression_score","castle_rate","bullet_ratio","opening_diversity"]
 
 def train_models(records, progress_cb=None):
     df=pd.DataFrame(records); df=df[df["opening_family"].notna()&(df["opening_family"]!="")].copy()
     if len(df)<30: return None,f"Only {len(df)} labeled games. Need at least 30."
+    # ── Per-player aggregate features (Lab 2 style) ──
     agg=df.groupby("username").agg(
-        win_rate=("outcome",lambda x:(x=="win").mean()),draw_rate=("outcome",lambda x:(x=="draw").mean()),
-        decisive_rate=("decisive","mean"),resign_rate=("resigned","mean"),
-        aggression_score=("num_moves",lambda x:1/(x.mean()+1))).reset_index()
+        win_rate=("outcome",lambda x:(x=="win").mean()),
+        draw_rate=("outcome",lambda x:(x=="draw").mean()),
+        decisive_rate=("decisive","mean"),
+        resign_rate=("resigned","mean"),
+        aggression_score=("num_moves",lambda x:1/(x.mean()+1)),
+        castle_rate=("castled","mean"),           # Lab feature: how often does the player castle?
+        bullet_ratio=("is_bullet","mean"),        # Lab feature: fraction of bullet games
+        opening_diversity=("opening_name",lambda x: min(x.nunique()/max(len(x),1), 1.0)),  # Lab feature: variety of openings
+    ).reset_index()
     df=df.merge(agg,on="username")
     feats=[f for f in FEATURES if f in df.columns]
     X=df[feats].fillna(0); y=df["opening_family"]
     if y.nunique()<2: return None,"Not enough opening variety — most games share the same opening family. Try adding more usernames."
-    # Only stratify if every class has enough samples for a split
     min_class_count = y.value_counts().min()
     use_stratify = y if min_class_count >= 5 else None
     X_train,X_test,y_train,y_test=train_test_split(X,y,test_size=0.2,random_state=42,stratify=use_stratify)
     scaler=StandardScaler(); Xtr_s=scaler.fit_transform(X_train); Xte_s=scaler.transform(X_test)
-    mdls={"Random Forest":(RandomForestClassifier(n_estimators=100,random_state=42),False),
-          "Decision Tree":(DecisionTreeClassifier(max_depth=6,random_state=42),False),
-          "Naive Bayes":(GaussianNB(),True),"SVM RBF":(SVC(kernel="rbf",probability=True,random_state=42),True)}
+
+    # ── Lab 9: K-Means unsupervised clustering (used as an extra validation signal) ──
+    if progress_cb: progress_cb("🔍 Running K-Means clustering (Lab 9)...")
+    kmeans=KMeans(n_clusters=4,random_state=42,n_init=10)
+    cluster_labels=kmeans.fit_predict(scaler.transform(X))
+    cluster_map={i:y.iloc[np.where(cluster_labels==i)[0]].mode()[0]
+                 for i in range(4) if len(np.where(cluster_labels==i)[0])>0}
+    if progress_cb: progress_cb(f"  ✓ K-Means cluster → style mapping: {cluster_map}")
+
+    # ── Lab 3/4/5/7/8: All supervised models ──
+    mdls={
+        "Naive Bayes":    (GaussianNB(), True),                                            # Lab 3
+        "Decision Tree":  (DecisionTreeClassifier(max_depth=6,random_state=42), False),    # Lab 4
+        "Random Forest":  (RandomForestClassifier(n_estimators=100,random_state=42,n_jobs=-1), False),  # Lab 5
+        "SVM RBF":        (SVC(kernel="rbf",probability=True,random_state=42), True),      # Lab 7
+        "Neural Network": (MLPClassifier(hidden_layer_sizes=(64,32),max_iter=500,         # Lab 8
+                           random_state=42,early_stopping=True,validation_fraction=0.1), True),
+    }
     results={}; best_acc,best_name,best_model=0,None,None
     for name,(model,scaled) in mdls.items():
         if progress_cb: progress_cb(f"🤖 Training {name}...")
@@ -274,7 +493,8 @@ def train_models(records, progress_cb=None):
     importances={f:round(float(v),4) for f,v in zip(feats,rf.feature_importances_)}
     saved={"model":best_model,"model_name":best_name,"scaler":scaler,"features":feats,
            "classes":sorted(y.unique()),"results":results,"importances":importances,
-           "total_games":len(df),"family_counts":df["opening_family"].value_counts().to_dict()}
+           "total_games":len(df),"family_counts":df["opening_family"].value_counts().to_dict(),
+           "kmeans":kmeans,"cluster_map":cluster_map}
     with open("best_model.pkl","wb") as f: pickle.dump(saved,f)
     if progress_cb: progress_cb(f"✅ Best: {best_name} ({round(best_acc*100,1)}%)")
     return saved,None
@@ -333,7 +553,10 @@ def recommend_for_user(username):
          "decisive":df["decisive"].mean(),"resigned":df["resigned"].mean(),
          "win_rate":(df["outcome"]=="win").mean(),"draw_rate":(df["outcome"]=="draw").mean(),
          "decisive_rate":df["decisive"].mean(),"resign_rate":df["resigned"].mean(),
-         "aggression_score":1/(df["num_moves"].mean()+1)}
+         "aggression_score":1/(df["num_moves"].mean()+1),
+         "castle_rate":df["castled"].mean() if "castled" in df.columns else 0.5,
+         "bullet_ratio":df["is_bullet"].mean() if "is_bullet" in df.columns else 0.0,
+         "opening_diversity":min(df["opening_name"].nunique()/max(len(df),1),1.0) if "opening_name" in df.columns else 0.5}
     feats=saved["features"]; X_new=pd.DataFrame([agg])[feats].fillna(0)
     model,model_name=saved["model"],saved["model_name"]
     needs_scale=any(x in model_name for x in ["SVM","Naive"])
@@ -504,8 +727,20 @@ input[type=text]::placeholder{color:var(--muted);}
 .owhy{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:12px;}
 .ometa{font-size:12px;color:var(--muted);border-top:1px solid var(--border);padding-top:12px;}
 .ometa strong{color:var(--text);}
+.octa{margin-top:14px;}
+.btn-chesscom{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:rgba(129,211,73,0.12);color:#81d349;border:1px solid rgba(129,211,73,0.25);border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;font-family:'DM Sans',sans-serif;transition:all 0.2s;}
+.btn-chesscom:hover{background:rgba(129,211,73,0.22);border-color:rgba(129,211,73,0.5);}
+.otabs{display:flex;gap:6px;padding:12px 12px 0;border-bottom:1px solid var(--border);background:#181412;width:100%;}
+.otab{background:none;border:none;color:var(--muted);font-size:12px;font-family:'DM Sans',sans-serif;padding:6px 12px;cursor:pointer;border-radius:6px 6px 0 0;transition:all 0.15s;}
+.otab.active{background:rgba(255,255,255,0.08);color:var(--text);}
+.pcard{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;}
+.pnum{font-family:'DM Mono',monospace;font-size:10px;color:var(--gold);margin-bottom:6px;}
+.pprompt{font-size:13px;color:var(--text);line-height:1.5;margin-bottom:10px;}
+.phint{font-size:12px;color:#c9a84c;background:rgba(201,168,76,0.08);padding:8px 10px;border-radius:6px;margin-bottom:8px;}
+.pans{font-size:13px;color:#2ecc71;background:rgba(46,204,113,0.08);padding:8px 10px;border-radius:6px;margin-bottom:8px;}
+.pbtnrow{display:flex;gap:8px;}
 /* Board area */
-.bwrap{background:#181412;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:10px;border-left:1px solid var(--border);}
+.bwrap{background:#181412;display:flex;flex-direction:column;align-items:center;padding:0 16px 16px;gap:10px;border-left:1px solid var(--border);overflow:auto;}
 .bcontrols{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;}
 .bbtn{background:rgba(255,255,255,0.07);border:none;color:var(--text);border-radius:6px;padding:5px 11px;font-size:12px;cursor:pointer;transition:background 0.15s;font-family:'DM Mono',monospace;}
 .bbtn:hover{background:rgba(255,255,255,0.15);}
@@ -525,6 +760,7 @@ input[type=text]::placeholder{color:var(--muted);}
 #rec-error{color:#e85d3a;font-size:13px;margin-top:10px;display:none;}
 #mcredit{text-align:center;margin-top:16px;color:var(--muted);font-size:12px;font-family:'DM Mono',monospace;}
 @media(max-width:700px){.ocard{grid-template-columns:1fr;}.mgrid{grid-template-columns:1fr;}.srow{grid-template-columns:1fr 1fr;}}
+.puzzle-panel{width:100%;padding:12px 0;overflow-y:auto;}
 </style>
 </head>
 <body>
@@ -845,6 +1081,13 @@ async function getRec(){
   renderResult(data);
 }
 
+function switchTab(btn, showId, hideId){
+  document.getElementById(showId).style.display='block';
+  document.getElementById(hideId).style.display='none';
+  btn.parentElement.querySelectorAll('.otab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+}
+
 function renderResult(d){
   const col=COLORS[d.predicted_family]||"#c9a84c";
   const hero=document.getElementById("hero");
@@ -865,9 +1108,20 @@ function renderResult(d){
       <div class="pp">${pct}%</div>
     </div>`).join("");
 
-  // Opening cards with boards
+  // Opening cards with boards + puzzles + chess.com link
   document.getElementById("olist").innerHTML=d.openings.map((o,i)=>{
     const bid=`board_${i}`;
+    const puzzleHTML=(o.puzzles||[]).map((pz,pi)=>`
+      <div class="pcard" id="pcard_${i}_${pi}">
+        <div class="pnum">Puzzle ${pi+1}</div>
+        <div class="pprompt">${pz.prompt}</div>
+        <div class="phint" id="phint_${i}_${pi}" style="display:none">💡 ${pz.hint}</div>
+        <div class="pans" id="pans_${i}_${pi}" style="display:none">✅ Answer: <strong>${pz.answer}</strong></div>
+        <div class="pbtnrow">
+          <button class="bbtn" onclick="document.getElementById('phint_${i}_${pi}').style.display='block'">Show Hint</button>
+          <button class="bbtn" style="background:rgba(46,204,113,0.15);color:#2ecc71" onclick="document.getElementById('pans_${i}_${pi}').style.display='block'">Reveal Answer</button>
+        </div>
+      </div>`).join("");
     return `
     <div class="ocard" style="border-top:3px solid ${col}">
       <div class="oinfo">
@@ -876,15 +1130,27 @@ function renderResult(d){
         <div class="opgn">${o.pgn}</div>
         <div class="owhy">${o.why}</div>
         <div class="ometa"><strong>Difficulty:</strong> ${o.difficulty} &nbsp;·&nbsp; <strong>Famous players:</strong> ${o.players}</div>
+        <div class="octa">
+          <a href="${o.chesscom||'https://www.chess.com/learn-how-to-play-chess'}" target="_blank" class="btn btn-chesscom">♟ Try on Chess.com</a>
+        </div>
       </div>
       <div class="bwrap">
-        ${buildBoardHTML(bid)}
-        <div class="mctr" id="${bid}_ctr"></div>
-        <div class="bcontrols">
-          <button class="bbtn" onclick="resetBoard('${bid}')">⏮ Start</button>
-          <button class="bbtn" onclick="stepMove('${bid}',-1)">◀</button>
-          <button class="bbtn" onclick="playAll('${bid}')">▶ Play</button>
-          <button class="bbtn" onclick="stepMove('${bid}',1)">▶|</button>
+        <div class="otabs">
+          <button class="otab active" onclick="switchTab(this,'${bid}_board','${bid}_puzzles')">📋 Opening Moves</button>
+          <button class="otab" onclick="switchTab(this,'${bid}_puzzles','${bid}_board')">🧩 Puzzles (${(o.puzzles||[]).length})</button>
+        </div>
+        <div id="${bid}_board">
+          ${buildBoardHTML(bid)}
+          <div class="mctr" id="${bid}_ctr"></div>
+          <div class="bcontrols">
+            <button class="bbtn" onclick="resetBoard('${bid}')">⏮ Start</button>
+            <button class="bbtn" onclick="stepMove('${bid}',-1)">◀</button>
+            <button class="bbtn" onclick="playAll('${bid}')">▶ Play</button>
+            <button class="bbtn" onclick="stepMove('${bid}',1)">▶|</button>
+          </div>
+        </div>
+        <div id="${bid}_puzzles" style="display:none">
+          ${puzzleHTML||'<p style="color:var(--muted);padding:16px">No puzzles for this opening yet.</p>'}
         </div>
       </div>
     </div>`;
