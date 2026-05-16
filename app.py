@@ -360,10 +360,50 @@ training_state={"status":"idle","logs":[],"result":None,"error":None}
 def run_training():
     global training_state
     training_state={"status":"training","logs":[],"result":None,"error":None}
-    TRAIN_USERS=["hikaru","magnuscarlsen","gothamchess","danielnaroditsky","fabianocaruana","anishgiri","penguingm","levonAronian"]
+    # ── Carefully chosen players — each is a clear example of their style ──
+    AGGRESSIVE_USERS=[
+        "hikaru",            # Super GM, ultra-sharp blitz/bullet tactician
+        "danielnaroditsky",  # Speed chess specialist, loves sharp lines
+        "nihalsarin",        # Young attacking Indian GM
+        "firouzja2003",      # World #2, extremely aggressive style
+        "rpragchess",        # Praggnanandhaa — sharp tactical prodigy
+        "lachesisq",         # Danya's alt account — pure blitz aggression
+    ]
+    CLASSICAL_USERS=[
+        "gothamchess",       # Levy Rozman — textbook principled play
+        "GMBenjaminFinegold",# Classical positional GM educator
+        "yasser-seirawan",   # Legend, pure classical style
+        "JohnBartholomewChess", # Classical educator, instructional games
+    ]
+    STRATEGIC_USERS=[
+        "magnuscarlsen",     # World Champion, strategic mastery
+        "fabianocaruana",    # Elite GM, deep preparation and strategy
+        "gmwso",             # Wesley So — positional genius
+        "liem_le",           # Le Quang Liem — strategic top GM
+        "gmkovalev",         # Strategic European GM
+        "alireza2003",       # Firouzja's strategic side — varied
+    ]
+    SOLID_USERS=[
+        "anishgiri",         # Draw master, ultra-solid Caro-Kann player
+        "levonAronian",      # Solid foundations with occasional creativity
+        "penguingm",         # FM streamer, reliable solid repertoire
+        "chessbrahs",        # Aman Hambleton — solid positional streamer
+        "dereque",           # Solid club-level educator
+        "GMHannes",          # Solid Scandinavian defensive style
+    ]
+    TRAIN_USERS=AGGRESSIVE_USERS+CLASSICAL_USERS+STRATEGIC_USERS+SOLID_USERS
+    # Build a lookup so each player's known style overrides move-based detection during training
+    KNOWN_STYLES={u:"Aggressive" for u in AGGRESSIVE_USERS}
+    KNOWN_STYLES.update({u:"Classical" for u in CLASSICAL_USERS})
+    KNOWN_STYLES.update({u:"Strategic" for u in STRATEGIC_USERS})
+    KNOWN_STYLES.update({u:"Solid" for u in SOLID_USERS})
     def log(msg): training_state["logs"].append(msg)
     log("🔄 Connecting to Chess.com API...")
-    records=fetch_all_games(TRAIN_USERS,months=2,progress_cb=log)
+    records=fetch_all_games(TRAIN_USERS,months=3,progress_cb=log)
+    # Override opening_family with known style for training players — much cleaner labels
+    for r in records:
+        if r.get("username","").lower() in {k.lower():v for k,v in KNOWN_STYLES.items()}:
+            r["opening_family"]=KNOWN_STYLES.get(r["username"], r["opening_family"])
     log(f"📦 Total records: {len(records)}")
     if not records: training_state["status"]="error"; training_state["error"]="No games fetched."; return
     saved,err=train_models(records,progress_cb=log)
