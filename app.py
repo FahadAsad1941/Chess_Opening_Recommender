@@ -329,36 +329,6 @@ def get_family_from_moves(pgn_moves_str):
     if m0 == 'f4': return 'Aggressive'
     return None
 
-def get_eco_family(eco):
-    """ECO code (A00-E99) → opening family. Most reliable method."""
-    if not eco or len(eco)<2: return None
-    try: letter=eco[0].upper(); num=int(eco[1:])
-    except: return None
-    if letter=='A':
-        if num<=9: return "Aggressive"
-        if num<=39: return "Strategic"   # English
-        if num<=44: return "Aggressive"  # Benoni
-        if num<=49: return "Solid"       # Dutch
-        return "Aggressive"
-    if letter=='B':
-        if num<=9: return "Aggressive"   # Scandinavian, Alekhine
-        if num<=19: return "Solid"       # Caro-Kann
-        return "Aggressive"              # Sicilian (B20-B99)
-    if letter=='C':
-        if num<=19: return "Classical"   # Spanish/Italian early
-        if num<=29: return "Aggressive"  # King's Gambit, Vienna
-        if num<=49: return "Classical"   # Italian, Four Knights
-        if num<=79: return "Classical"   # Ruy Lopez
-        return "Solid"                   # French
-    if letter=='D':
-        if num<=49: return "Strategic"   # QGD, Slav
-        return "Strategic"               # Grunfeld
-    if letter=='E':
-        if num<=19: return "Strategic"   # Catalan, Bogo, QID
-        if num<=59: return "Strategic"   # Nimzo-Indian
-        return "Aggressive"              # King's Indian, Benoni
-    return None
-
 def get_opening_family(name):
     if not name: return "Classical"  # default instead of None
     o = name.lower()
@@ -415,7 +385,7 @@ def parse_pgn_games(pgn_text, username):
             return m.group(1) if m else None
         white,black=tag("White") or "",tag("Black") or ""
         result=tag("Result"); welo_s,belo_s=tag("WhiteElo"),tag("BlackElo")
-        tc=tag("TimeClass") or "blitz"; opening=tag("Opening"); eco=tag("ECO"); term=tag("Termination") or ""
+        tc=tag("TimeClass") or "blitz"; opening=tag("Opening"); term=tag("Termination") or ""
         if not result: continue
         try:
             welo=int(welo_s) if welo_s and welo_s!="?" else None
@@ -432,7 +402,7 @@ def parse_pgn_games(pgn_text, username):
         else: continue
         moves_text=re.sub(r'^(\[.*?\]\s*)+','',game_str,flags=re.DOTALL).strip()
         moves=re.findall(r'\d+\.(?!\.\.)(?!\s*\.)',game_str)
-        family=get_family_from_moves(moves_text) or get_eco_family(eco) or get_opening_family(opening)
+        family=get_family_from_moves(moves_text) or get_opening_family(opening)
         castled=1 if "O-O" in moves_text else 0
         records.append({"username":username,"player_elo":player_elo,"opponent_elo":opp_elo,
             "elo_diff":player_elo-opp_elo,"played_as_enc":1 if played_as=="white" else 0,
@@ -488,7 +458,6 @@ def train_models(records, progress_cb=None):
     df=df.merge(agg,on="username")
     feats=[f for f in FEATURES if f in df.columns]
     X=df[feats].fillna(0); y=df["opening_family"]
-    if progress_cb: progress_cb(f"📊 Family distribution: {y.value_counts().to_dict()}")
     if y.nunique()<2: return None,"Not enough opening variety — most games share the same opening family. Try adding more usernames."
     min_class_count = y.value_counts().min()
     use_stratify = y if min_class_count >= 5 else None
@@ -503,23 +472,22 @@ def train_models(records, progress_cb=None):
                  for i in range(4) if len(np.where(cluster_labels==i)[0])>0}
     if progress_cb: progress_cb(f"  ✓ K-Means cluster → style mapping: {cluster_map}")
 
-    # ── Lab 3/4/5/7: Supervised models (optimised for speed on Railway) ──
-    from sklearn.linear_model import LogisticRegression
+    # ── Lab 3/4/5/7/8: All supervised models ──
     mdls={
-        "Naive Bayes":     (GaussianNB(), True),                                                        # Lab 3
-        "Decision Tree":   (DecisionTreeClassifier(max_depth=6,random_state=42), False),                # Lab 4
-        "Random Forest":   (RandomForestClassifier(n_estimators=50,random_state=42,n_jobs=-1), False),  # Lab 5
-        "Logistic Reg":    (LogisticRegression(max_iter=300,random_state=42,n_jobs=-1), True),          # Lab 6
-        "SVM Linear":      (SVC(kernel="linear",C=1.0,probability=True,random_state=42,max_iter=2000),True), # Lab 7
+        "Naive Bayes":    (GaussianNB(), True),                                            # Lab 3
+        "Decision Tree":  (DecisionTreeClassifier(max_depth=6,random_state=42), False),    # Lab 4
+        "Random Forest":  (RandomForestClassifier(n_estimators=100,random_state=42,n_jobs=-1), False),  # Lab 5
+        "SVM RBF":        (SVC(kernel="rbf",probability=True,random_state=42), True),      # Lab 7
+        "Neural Network": (MLPClassifier(hidden_layer_sizes=(64,32),max_iter=500,         # Lab 8
+                           random_state=42,early_stopping=True,validation_fraction=0.1), True),
     }
     results={}; best_acc,best_name,best_model=0,None,None
     for name,(model,scaled) in mdls.items():
-        t0=time.time()
         if progress_cb: progress_cb(f"🤖 Training {name}...")
         Xtr=Xtr_s if scaled else X_train; Xte=Xte_s if scaled else X_test
         model.fit(Xtr,y_train); acc=accuracy_score(y_test,model.predict(Xte))
         results[name]=round(acc*100,1)
-        if progress_cb: progress_cb(f"  ✓ {name}: {round(acc*100,1)}% ({round(time.time()-t0,1)}s)")
+        if progress_cb: progress_cb(f"  ✓ {name}: {round(acc*100,1)}%")
         if acc>best_acc: best_acc,best_name,best_model=acc,name,model
     rf=mdls["Random Forest"][0]
     importances={f:round(float(v),4) for f,v in zip(feats,rf.feature_importances_)}
@@ -785,6 +753,14 @@ input[type=text]::placeholder{color:var(--muted);}
 .sq .wp{color:#fff;text-shadow:0 0 2px #000,0 1px 3px rgba(0,0,0,0.8);}
 .sq .bp{color:#1a1a1a;text-shadow:0 1px 2px rgba(255,255,255,0.5);}
 .sq.lm{background-color:rgba(255,213,0,0.4)!important;}
+.sq.selected{background-color:rgba(100,180,255,0.7)!important;box-shadow:inset 0 0 0 3px #3a7bd5;}
+.sq.hint-sq::after{content:'';position:absolute;width:30%;height:30%;border-radius:50%;background:rgba(0,0,0,0.25);pointer-events:none;}
+.pboard-wrap{display:flex;justify-content:center;margin:10px 0;}
+.pfeedback{text-align:center;font-size:13px;padding:8px;min-height:28px;font-family:'DM Mono',monospace;}
+.pcard{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;}
+.pnum{font-family:'DM Mono',monospace;font-size:11px;color:var(--gold);margin-bottom:6px;}
+.pprompt{font-size:14px;font-weight:500;margin-bottom:10px;line-height:1.5;}
+.pbtnrow{display:flex;gap:8px;margin-top:8px;justify-content:center;}
 /* rank/file labels */
 .board-outer{position:relative;}
 .spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(0,0,0,0.3);border-top-color:#000;border-radius:50%;animation:spin 0.7s linear infinite;}
@@ -807,15 +783,7 @@ input[type=text]::placeholder{color:var(--muted);}
   <div class="card-sub">Fetches real games from Chess.com's free public API and trains 4 ML models (Decision Tree, Random Forest, Naive Bayes, SVM). Takes ~2 minutes.</div>
   <div id="sbar" class="sbar warn"><div class="dot" id="sdot"></div><span id="stext">Model not trained yet</span></div>
   <button class="btn btn-gold" id="train-btn" onclick="startTraining()">Train Model</button>
-  <div id="tprog" style="display:none;margin-top:16px;">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-      <div class="logbox" id="logbox"></div>
-      <div style="background:#0a0a0c;border:1px solid var(--border);border-radius:10px;padding:12px;">
-        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:8px;">LIVE ACCURACY CHART</div>
-        <canvas id="trainChart" height="120"></canvas>
-      </div>
-    </div>
-  </div>
+  <div id="tprog" style="display:none;margin-top:16px;"><div class="logbox" id="logbox"></div></div>
   <div id="mresults" style="display:none;margin-top:20px;">
     <div class="stitle" style="margin-bottom:10px;">Model Comparison</div>
     <div class="mgrid" id="mgrid"></div>
@@ -1086,85 +1054,14 @@ async function startTraining(){
   pollTraining();
 }
 
-// Live training chart data
-let chartData={labels:[],values:[]};
-let chartCtx=null;
-
-function initChart(){
-  const canvas=document.getElementById("trainChart");
-  if(!canvas)return;
-  chartCtx=canvas.getContext("2d");
-  chartData={labels:[],values:[]};
-  drawChart();
-}
-
-function drawChart(){
-  if(!chartCtx)return;
-  const canvas=document.getElementById("trainChart");
-  const W=canvas.width=canvas.offsetWidth; const H=canvas.height=120;
-  chartCtx.clearRect(0,0,W,H);
-  // Background
-  chartCtx.fillStyle="#0a0a0c"; chartCtx.fillRect(0,0,W,H);
-  // Grid lines
-  [25,50,75,100].forEach(v=>{
-    const y=H-(v/100)*H;
-    chartCtx.strokeStyle="rgba(255,255,255,0.05)"; chartCtx.lineWidth=1;
-    chartCtx.beginPath(); chartCtx.moveTo(0,y); chartCtx.lineTo(W,y); chartCtx.stroke();
-    chartCtx.fillStyle="rgba(255,255,255,0.2)"; chartCtx.font="9px DM Mono,monospace";
-    chartCtx.fillText(v+"%",2,y-2);
-  });
-  if(chartData.values.length<1)return;
-  const COLORS={"Naive Bayes":"#d4537e","Decision Tree":"#378add","Random Forest":"#2ecc71","Logistic Reg":"#ef9f27","SVM Linear":"#7f77dd"};
-  const n=chartData.labels.length;
-  const barW=Math.min(40, (W-20)/Math.max(n,1));
-  chartData.labels.forEach((label,i)=>{
-    const acc=chartData.values[i];
-    const x=20+i*(barW+6);
-    const barH=(acc/100)*(H-20);
-    const col=COLORS[label]||"#c9a84c";
-    // Bar
-    chartCtx.fillStyle=col+"33"; chartCtx.fillRect(x,H-barH,barW,barH);
-    chartCtx.fillStyle=col; chartCtx.fillRect(x,H-barH,barW,4);
-    // Label
-    chartCtx.fillStyle=col; chartCtx.font="bold 11px DM Mono,monospace";
-    chartCtx.fillText(acc+"%",x,H-barH-4);
-    // Model name — abbreviated
-    chartCtx.fillStyle="rgba(255,255,255,0.4)"; chartCtx.font="9px DM Mono,monospace";
-    const short=label.replace("Random Forest","RF").replace("Decision Tree","DT").replace("Naive Bayes","NB").replace("Logistic Reg","LR").replace("SVM Linear","SVM");
-    chartCtx.fillText(short,x,H-2);
-  });
-}
-
 function pollTraining(){
   const lb=document.getElementById("logbox");
-  initChart();
   const iv=setInterval(async()=>{
     const st=await fetch("/api/train/status").then(x=>x.json());
-    lb.innerHTML=st.logs.map(l=>`<p class="${l.startsWith("✅")?"ok":""}">${l}</p>`).join("");
+    lb.innerHTML=st.logs.map(l=>`<p class="${l.startsWith('✅')?'ok':''}">${l}</p>`).join("");
     lb.scrollTop=lb.scrollHeight;
-    // Parse accuracy results from logs for live chart
-    st.logs.forEach(line=>{
-      const m=line.match(/✓ (.+): ([\d.]+)%/);
-      if(m){
-        const name=m[1].trim(); const acc=parseFloat(m[2]);
-        const idx=chartData.labels.indexOf(name);
-        if(idx===-1){chartData.labels.push(name);chartData.values.push(acc);}
-        else chartData.values[idx]=acc;
-        drawChart();
-      }
-    });
-    if(st.status==="done"){
-      clearInterval(iv);
-      showMR(st.result.model_results,st.result.best_model,st.result.total_games);
-      document.getElementById("train-btn").innerHTML="Re-train";
-      document.getElementById("train-btn").disabled=false;
-    }
-    if(st.status==="error"){
-      clearInterval(iv);
-      lb.innerHTML+=`<p style="color:#e85d3a">❌ ${st.error}</p>`;
-      document.getElementById("train-btn").innerHTML="Retry";
-      document.getElementById("train-btn").disabled=false;
-    }
+    if(st.status==="done"){clearInterval(iv);showMR(st.result.model_results,st.result.best_model,st.result.total_games);document.getElementById("train-btn").innerHTML="Re-train";document.getElementById("train-btn").disabled=false;}
+    if(st.status==="error"){clearInterval(iv);lb.innerHTML+=`<p style="color:#e85d3a">❌ ${st.error}</p>`;document.getElementById("train-btn").innerHTML="Retry";document.getElementById("train-btn").disabled=false;}
   },1500);
 }
 
@@ -1173,14 +1070,11 @@ function showMR(results,best,totalGames){
   document.getElementById("sdot").classList.remove("pulse");
   document.getElementById("stext").textContent=`✓ Ready · ${totalGames} games · Best model: ${best}`;
   document.getElementById("mgrid").innerHTML=Object.entries(results).sort((a,b)=>b[1]-a[1]).map(([n,acc])=>`
-    <div class="mc ${n===best?"best":""}">
-      <div><div class="mcn">${n}</div>${n===best?"<div class=\"bbadge\">⭐ Best</div>":""}</div>
-      <div class="mca" style="color:${acc>=70?"#2ecc71":acc>=55?"#c9a84c":"#e85d3a"}">${acc}%</div>
+    <div class="mc ${n===best?'best':''}">
+      <div><div class="mcn">${n}</div>${n===best?'<div class="bbadge">⭐ Best</div>':''}</div>
+      <div class="mca" style="color:${acc>=70?'#2ecc71':acc>=55?'#c9a84c':'#e85d3a'}">${acc}%</div>
     </div>`).join("");
   document.getElementById("mresults").style.display="block";
-  // Final chart with all results
-  chartData={labels:Object.keys(results),values:Object.values(results)};
-  drawChart();
 }
 
 async function getRec(){
@@ -1222,20 +1116,193 @@ function renderResult(d){
       <div class="pp">${pct}%</div>
     </div>`).join("");
 
+  // ═══════════════════════════════════════════
+  //  PUZZLE ENGINE
+  // ═══════════════════════════════════════════
+  const PZ={};  // puzzle states keyed by "i_pi"
+
+  function loadFEN(fen){
+    // Parse FEN into board array
+    const b=Array(8).fill(null).map(()=>Array(8).fill(null));
+    const piecemap={k:'K',q:'Q',r:'R',b:'B',n:'N',p:'P'};
+    const rows=fen.split(' ')[0].split('/');
+    rows.forEach((row,r)=>{
+      let c=0;
+      for(const ch of row){
+        if(ch>='1'&&ch<='8'){c+=parseInt(ch);}
+        else{
+          const upper=ch.toUpperCase();
+          const color=ch===upper?'w':'b';
+          b[r][c]=color+upper; c++;
+        }
+      }
+    });
+    return b;
+  }
+
+  function initPuzzleBoard(pid, fen, answer){
+    const board=loadFEN(fen);
+    // Determine whose turn from FEN
+    const turn=(fen.split(' ')[1]||'w');
+    PZ[pid]={board, answer, turn, selected:null, solved:false, attempts:0};
+    renderPuzzleBoard(pid);
+  }
+
+  function renderPuzzleBoard(pid){
+    const state=PZ[pid];
+    if(!state)return;
+    for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+      const el=document.getElementById(`${pid}_${r}_${c}`);
+      if(!el)continue;
+      el.textContent=state.board[r][c]?PC[state.board[r][c]]||'':'';
+      el.classList.remove('selected','lm','hint-sq');
+      if(state.selected&&state.selected[0]===r&&state.selected[1]===c)
+        el.classList.add('selected');
+    }
+  }
+
+  function puzzleSquareClick(pid, r, c){
+    const state=PZ[pid];
+    if(!state||state.solved)return;
+    const board=state.board;
+    const sq=board[r][c];
+
+    // If nothing selected yet — select a piece of the right color
+    if(!state.selected){
+      if(sq&&sq[0]===state.turn){
+        state.selected=[r,c];
+        renderPuzzleBoard(pid);
+        // highlight legal-looking squares
+        highlightTargets(pid,r,c);
+      }
+      return;
+    }
+
+    const [fr,fc]=state.selected;
+    // Clicked same square — deselect
+    if(fr===r&&fc===c){state.selected=null;renderPuzzleBoard(pid);return;}
+    // Clicked own piece — reselect
+    if(sq&&sq[0]===state.turn){state.selected=[r,c];renderPuzzleBoard(pid);highlightTargets(pid,r,c);return;}
+
+    // Attempt a move
+    const FILES='abcdefgh';
+    const piece=board[fr][fc];
+    // Build move notation
+    let moveStr='';
+    const toFile=FILES[c];
+    const toRank=(8-r).toString();
+    if(piece[1]==='P'){
+      // pawn capture
+      if(fc!==c) moveStr=FILES[fc]+'x'+toFile+toRank;
+      else moveStr=toFile+toRank;
+    } else {
+      const cap=board[r][c]?'x':'';
+      moveStr=piece[1]+cap+toFile+toRank;
+    }
+
+    // Check against answer (flexible: e4, Nf3, exf4, etc.)
+    const ans=state.answer.replace(/[+#]/g,'');
+    const attempt=moveStr.replace(/[+#]/g,'');
+
+    state.selected=null;
+    state.attempts++;
+
+    if(attempt===ans||moveStr===state.answer){
+      // CORRECT
+      const newBoard=applyMove(board,state.answer,state.turn==='w');
+      state.board=newBoard;
+      state.solved=true;
+      renderPuzzleBoard(pid);
+      showPuzzleFeedback(pid,'correct');
+    } else {
+      // WRONG
+      renderPuzzleBoard(pid);
+      showPuzzleFeedback(pid,'wrong');
+      // Flash the square red briefly
+      const el=document.getElementById(`${pid}_${r}_${c}`);
+      if(el){el.style.background='rgba(232,93,58,0.6)';setTimeout(()=>{el.style.background='';},600);}
+    }
+  }
+
+  function highlightTargets(pid,fr,fc){
+    // Lightly highlight squares the selected piece might go to
+    const state=PZ[pid];
+    if(!state)return;
+    const piece=state.board[fr][fc];
+    if(!piece)return;
+    for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+      if(r===fr&&c===fc)continue;
+      if(canReach(state.board,fr,fc,r,c,piece[1],piece[0])){
+        const el=document.getElementById(`${pid}_${r}_${c}`);
+        if(el)el.classList.add('hint-sq');
+      }
+    }
+  }
+
+  function showPuzzleFeedback(pid, type){
+    const el=document.getElementById(`${pid}_feedback`);
+    if(!el)return;
+    if(type==='correct'){
+      el.innerHTML='<span style="color:#2ecc71;font-size:15px">✅ Correct! Well played.</span>';
+    } else {
+      el.innerHTML='<span style="color:#e85d3a;font-size:15px">❌ Wrong move — try again!</span>';
+      setTimeout(()=>{if(!PZ[pid].solved)el.innerHTML=el.innerHTML.replace('❌ Wrong move — try again!','💭 Keep trying...');},2000);
+    }
+  }
+
+  function buildPuzzleBoard(pid){
+    let h=`<div class="cboard" id="${pid}" style="cursor:pointer">`;
+    for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+      const light=(r+c)%2===0;
+      h+=`<div class="sq ${light?'light':'dark'}" id="${pid}_${r}_${c}" onclick="puzzleSquareClick('${pid}',${r},${c})"></div>`;
+    }
+    return h+'</div>';
+  }
+
+  function resetPuzzle(pid, fen, answer){
+    initPuzzleBoard(pid,fen,answer);
+    const fb=document.getElementById(`${pid}_feedback`);
+    if(fb)fb.innerHTML='<span style="color:var(--muted)">Your turn — click a piece to move</span>';
+  }
+
+  function revealPuzzleAnswer(pid, answer){
+    const fb=document.getElementById(`${pid}_feedback`);
+    if(fb)fb.innerHTML=`<span style="color:var(--gold)">💡 Answer: <strong>${answer}</strong></span>`;
+    if(PZ[pid]){
+      const state=PZ[pid];
+      const newBoard=applyMove(state.board,answer,state.turn==='w');
+      state.board=newBoard; state.solved=true;
+      renderPuzzleBoard(pid);
+    }
+  }
+
+  // ═══════════════════════════════════════════
+  //  RENDER RESULT
+  // ═══════════════════════════════════════════
   // Opening cards with boards + puzzles + chess.com link
   document.getElementById("olist").innerHTML=d.openings.map((o,i)=>{
     const bid=`board_${i}`;
-    const puzzleHTML=(o.puzzles||[]).map((pz,pi)=>`
+    const puzzles=o.puzzles||[];
+
+    const puzzleHTML=puzzles.map((pz,pi)=>{
+      const pid=`pz_${i}_${pi}`;
+      return `
       <div class="pcard" id="pcard_${i}_${pi}">
-        <div class="pnum">Puzzle ${pi+1}</div>
+        <div class="pnum">Puzzle ${pi+1} of ${puzzles.length}</div>
         <div class="pprompt">${pz.prompt}</div>
-        <div class="phint" id="phint_${i}_${pi}" style="display:none">💡 ${pz.hint}</div>
-        <div class="pans" id="pans_${i}_${pi}" style="display:none">✅ Answer: <strong>${pz.answer}</strong></div>
-        <div class="pbtnrow">
-          <button class="bbtn" onclick="document.getElementById('phint_${i}_${pi}').style.display='block'">Show Hint</button>
-          <button class="bbtn" style="background:rgba(46,204,113,0.15);color:#2ecc71" onclick="document.getElementById('pans_${i}_${pi}').style.display='block'">Reveal Answer</button>
+        <div class="pboard-wrap">
+          ${buildPuzzleBoard(pid)}
         </div>
-      </div>`).join("");
+        <div class="pfeedback" id="${pid}_feedback">
+          <span style="color:var(--muted)">Your turn — click a piece to move</span>
+        </div>
+        <div class="pbtnrow">
+          <button class="bbtn" onclick="revealPuzzleAnswer('${pid}','${pz.answer}')">💡 Show Answer</button>
+          <button class="bbtn" onclick="resetPuzzle('${pid}','${pz.fen.replace(/'/g,'\\'')}','${pz.answer}')">🔄 Reset</button>
+        </div>
+      </div>`;
+    }).join("");
+
     return `
     <div class="ocard" style="border-top:3px solid ${col}">
       <div class="oinfo">
@@ -1251,7 +1318,7 @@ function renderResult(d){
       <div class="bwrap">
         <div class="otabs">
           <button class="otab active" onclick="switchTab(this,'${bid}_board','${bid}_puzzles')">📋 Opening Moves</button>
-          <button class="otab" onclick="switchTab(this,'${bid}_puzzles','${bid}_board')">🧩 Puzzles (${(o.puzzles||[]).length})</button>
+          <button class="otab" onclick="switchTab(this,'${bid}_puzzles','${bid}_board')">🧩 Puzzles (${puzzles.length})</button>
         </div>
         <div id="${bid}_board">
           ${buildBoardHTML(bid)}
@@ -1263,14 +1330,25 @@ function renderResult(d){
             <button class="bbtn" onclick="stepMove('${bid}',1)">▶|</button>
           </div>
         </div>
-        <div id="${bid}_puzzles" style="display:none">
+        <div id="${bid}_puzzles" style="display:none;overflow-y:auto;max-height:520px">
           ${puzzleHTML||'<p style="color:var(--muted);padding:16px">No puzzles for this opening yet.</p>'}
         </div>
       </div>
     </div>`;
   }).join("");
 
-  setTimeout(()=>d.openings.forEach((o,i)=>initOpeningBoard(`board_${i}`,o.moves)),80);
+  // Init opening boards
+  setTimeout(()=>{
+    d.openings.forEach((o,i)=>{
+      initOpeningBoard(`board_${i}`,o.moves);
+      // Init puzzle boards
+      (o.puzzles||[]).forEach((pz,pi)=>{
+        const pid=`pz_${i}_${pi}`;
+        initPuzzleBoard(pid, pz.fen, pz.answer);
+      });
+    });
+  },80);
+
   document.getElementById("mcredit").textContent=`Predicted by ${d.model_used} · ${d.model_accuracy}% accuracy`;
   document.getElementById("result").style.display="block";
   document.getElementById("result").scrollIntoView({behavior:"smooth"});
@@ -1287,5 +1365,5 @@ if __name__=="__main__":
     print("\n  Open your browser at:  http://localhost:5000")
     print("  Press Ctrl+C to stop")
     print("="*50+"\n")
-    port=int(os.environ.get("PORT",8080))
+    port=int(os.environ.get("PORT",5000))
     app.run(debug=False,host="0.0.0.0",port=port)
