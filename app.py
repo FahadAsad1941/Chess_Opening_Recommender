@@ -611,19 +611,27 @@ def run_training():
     KNOWN_STYLES.update({u:"Strategic" for u in STRATEGIC_USERS})
     KNOWN_STYLES.update({u:"Solid" for u in SOLID_USERS})
     def log(msg): training_state["logs"].append(msg)
-    log("🔄 Connecting to Chess.com API...")
-    records=fetch_all_games(TRAIN_USERS,months=3,progress_cb=log)
-    # Override opening_family with known style for training players — much cleaner labels
-    for r in records:
-        if r.get("username","").lower() in {k.lower():v for k,v in KNOWN_STYLES.items()}:
-            r["opening_family"]=KNOWN_STYLES.get(r["username"], r["opening_family"])
-    log(f"📦 Total records: {len(records)}")
-    if not records: training_state["status"]="error"; training_state["error"]="No games fetched."; return
-    saved,err=train_models(records,progress_cb=log)
-    if err: training_state["status"]="error"; training_state["error"]=err; return
-    training_state["status"]="done"
-    training_state["result"]={"total_games":saved["total_games"],"model_results":saved["results"],
-                               "best_model":saved["model_name"],"family_counts":saved["family_counts"],"importances":saved["importances"]}
+    try:
+        log("🔄 Connecting to Chess.com API...")
+        records=fetch_all_games(TRAIN_USERS,months=3,progress_cb=log)
+        # Override opening_family with known style for training players
+        for r in records:
+            if r.get("username","").lower() in {k.lower():v for k,v in KNOWN_STYLES.items()}:
+                r["opening_family"]=KNOWN_STYLES.get(r["username"], r["opening_family"])
+        log(f"📦 Total records: {len(records)}")
+        if not records:
+            training_state["status"]="error"; training_state["error"]="No games fetched."; return
+        saved,err=train_models(records,progress_cb=log)
+        if err:
+            training_state["status"]="error"; training_state["error"]=err; return
+        training_state["status"]="done"
+        training_state["result"]={"total_games":saved["total_games"],"model_results":saved["results"],
+                                   "best_model":saved["model_name"],"family_counts":saved["family_counts"],"importances":saved["importances"]}
+    except Exception as e:
+        import traceback
+        training_state["status"]="error"
+        training_state["error"]=f"Unexpected error: {str(e)}"
+        training_state["logs"].append(f"💥 {traceback.format_exc()}")
 
 @app.route("/")
 def index(): return render_template_string(HTML)
@@ -1040,7 +1048,17 @@ async function startTraining(){
   document.getElementById("sbar").className="sbar warn";
   document.getElementById("stext").textContent="Training in progress...";
   document.getElementById("sdot").classList.add("pulse");
-  await fetch("/api/train",{method:"POST"});
+  try{
+    const r=await fetch("/api/train",{method:"POST"});
+    const d=await r.json();
+    if(d.error){
+      document.getElementById("logbox").innerHTML=`<p style="color:#e85d3a">❌ ${d.error}</p>`;
+      btn.disabled=false;btn.innerHTML="Retry";return;
+    }
+  } catch(e){
+    document.getElementById("logbox").innerHTML=`<p style="color:#e85d3a">❌ Network error: ${e.message}</p>`;
+    btn.disabled=false;btn.innerHTML="Retry";return;
+  }
   pollTraining();
 }
 
@@ -1249,7 +1267,8 @@ function renderResult(d){
     return h+'</div>';
   }
 
-  function resetPuzzle(pid, fen, answer){
+  function resetPuzzle(pid, fenOrEl, answer){
+    const fen = (typeof fenOrEl === 'string') ? fenOrEl : fenOrEl;
     initPuzzleBoard(pid,fen,answer);
     const fb=document.getElementById(`${pid}_feedback`);
     if(fb)fb.innerHTML='<span style="color:var(--muted)">Your turn — click a piece to move</span>';
@@ -1288,7 +1307,7 @@ function renderResult(d){
         </div>
         <div class="pbtnrow">
           <button class="bbtn" onclick="revealPuzzleAnswer('${pid}','${pz.answer}')">💡 Show Answer</button>
-          <button class="bbtn" onclick="resetPuzzle('${pid}','${pz.fen.replace(/'/g,'\\'')}','${pz.answer}')">🔄 Reset</button>
+          <button class="bbtn" onclick="resetPuzzle('${pid}',this.dataset.fen,'${pz.answer}')" data-fen="${pz.fen}">🔄 Reset</button>
         </div>
       </div>`;
     }).join("");
