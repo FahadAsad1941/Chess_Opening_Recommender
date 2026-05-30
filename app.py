@@ -8,9 +8,8 @@ HOW TO RUN:
 from flask import Flask, render_template_string, jsonify, request
 import requests, pandas as pd, numpy as np
 import re, threading, time, pickle, os, warnings
-from sklearn.neural_network import MLPClassifier
-from sklearn.cluster import KMeans
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
@@ -464,37 +463,28 @@ def train_models(records, progress_cb=None):
     X_train,X_test,y_train,y_test=train_test_split(X,y,test_size=0.2,random_state=42,stratify=use_stratify)
     scaler=StandardScaler(); Xtr_s=scaler.fit_transform(X_train); Xte_s=scaler.transform(X_test)
 
-    # ── Lab 9: K-Means unsupervised clustering (used as an extra validation signal) ──
-    if progress_cb: progress_cb("🔍 Running K-Means clustering (Lab 9)...")
-    kmeans=KMeans(n_clusters=4,random_state=42,n_init=10)
-    cluster_labels=kmeans.fit_predict(scaler.transform(X))
-    cluster_map={i:y.iloc[np.where(cluster_labels==i)[0]].mode()[0]
-                 for i in range(4) if len(np.where(cluster_labels==i)[0])>0}
-    if progress_cb: progress_cb(f"  ✓ K-Means cluster → style mapping: {cluster_map}")
-
-    # ── Lab 3/4/5/7/8: All supervised models ──
+    # ── Lab 3/4/5/6/7: Fast supervised models ──
     mdls={
-        "Naive Bayes":    (GaussianNB(), True),                                            # Lab 3
-        "Decision Tree":  (DecisionTreeClassifier(max_depth=6,random_state=42), False),    # Lab 4
-        "Random Forest":  (RandomForestClassifier(n_estimators=100,random_state=42,n_jobs=-1), False),  # Lab 5
-        "SVM RBF":        (SVC(kernel="rbf",probability=True,random_state=42), True),      # Lab 7
-        "Neural Network": (MLPClassifier(hidden_layer_sizes=(64,32),max_iter=500,         # Lab 8
-                           random_state=42,early_stopping=True,validation_fraction=0.1), True),
+        "Naive Bayes":    (GaussianNB(), True),
+        "Decision Tree":  (DecisionTreeClassifier(max_depth=6,random_state=42), False),
+        "Random Forest":  (RandomForestClassifier(n_estimators=50,random_state=42,n_jobs=-1), False),
+        "Logistic Reg":   (LogisticRegression(max_iter=300,random_state=42), True),
+        "SVM Linear":     (SVC(kernel="linear",C=1.0,probability=True,random_state=42,max_iter=2000), True),
     }
     results={}; best_acc,best_name,best_model=0,None,None
     for name,(model,scaled) in mdls.items():
+        t0=time.time()
         if progress_cb: progress_cb(f"🤖 Training {name}...")
         Xtr=Xtr_s if scaled else X_train; Xte=Xte_s if scaled else X_test
         model.fit(Xtr,y_train); acc=accuracy_score(y_test,model.predict(Xte))
         results[name]=round(acc*100,1)
-        if progress_cb: progress_cb(f"  ✓ {name}: {round(acc*100,1)}%")
+        if progress_cb: progress_cb(f"  ✓ {name}: {round(acc*100,1)}% ({round(time.time()-t0,1)}s)")
         if acc>best_acc: best_acc,best_name,best_model=acc,name,model
     rf=mdls["Random Forest"][0]
     importances={f:round(float(v),4) for f,v in zip(feats,rf.feature_importances_)}
     saved={"model":best_model,"model_name":best_name,"scaler":scaler,"features":feats,
            "classes":sorted(y.unique()),"results":results,"importances":importances,
-           "total_games":len(df),"family_counts":df["opening_family"].value_counts().to_dict(),
-           "kmeans":kmeans,"cluster_map":cluster_map}
+           "total_games":len(df),"family_counts":df["opening_family"].value_counts().to_dict()}
     with open("best_model.pkl","wb") as f: pickle.dump(saved,f)
     if progress_cb: progress_cb(f"✅ Best: {best_name} ({round(best_acc*100,1)}%)")
     return saved,None
