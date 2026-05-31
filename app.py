@@ -561,7 +561,7 @@ def recommend_for_user(username):
          "opening_diversity":min(df["opening_name"].nunique()/max(len(df),1),1.0) if "opening_name" in df.columns else 0.5}
     feats=saved["features"]; X_new=pd.DataFrame([agg])[feats].fillna(0)
     model,model_name=saved["model"],saved["model_name"]
-    needs_scale=any(x in model_name for x in ["SVM","Naive"])
+    needs_scale=any(x in model_name for x in ["SVM","Naive","Logistic"])
     X_input=saved["scaler"].transform(X_new) if needs_scale else X_new
     pred=model.predict(X_input)[0]
     probs={}
@@ -580,7 +580,7 @@ def recommend_for_user(username):
             "black_openings":black_ops,
             "style_info":{"emoji":info["emoji"],"color":info["color"],"description":info["description"],"tip":info["tip"]},
             "player_stats":player_stats,
-            "model_used":model_name,"model_accuracy":saved["results"].get(model_name,0)},None
+            "model_used":model_name,"model_accuracy":(lambda r: r.get("acc",r.get("accuracy",0)) if isinstance(r,dict) else (round(float(r)*100,1) if float(r)<=1.0 else float(r)))(saved["results"].get(model_name,0))},None
 
 training_state={"status":"idle","logs":[],"result":None,"error":None}
 
@@ -685,21 +685,25 @@ def api_model_status():
         clean_results = {}
         for k, v in raw_results.items():
             if isinstance(v, dict):
-                num = v.get("accuracy") or v.get("acc") or v.get("test_accuracy")
-                if num is None:
-                    nums = [x for x in v.values() if isinstance(x, (int, float))]
+                # Colab format: {'acc': 46.1, 'f1': 37.5, 'cv': 46.1}
+                # acc is already a percentage, not a fraction
+                if "acc" in v:
+                    num = float(v["acc"])
+                elif "accuracy" in v:
+                    num = float(v["accuracy"])
+                    if num <= 1.0: num = round(num * 100, 1)
+                else:
+                    nums = [float(x) for x in v.values() if isinstance(x, (int, float))]
                     num = nums[0] if nums else 0.0
-                clean_results[k] = round(float(num) * 100 if float(num) <= 1.0 else float(num), 1)
+                clean_results[k] = round(num, 1)
             elif isinstance(v, (int, float)):
                 val = float(v)
                 clean_results[k] = round(val * 100 if val <= 1.0 else val, 1)
             else:
                 clean_results[k] = 0.0
-        # Colab may store game count under different keys
         total_games = int(saved.get("total_games") or saved.get("num_games") or saved.get("n_games") or saved.get("game_count") or 0)
         return jsonify({"trained":True,"results":clean_results,"best":saved["model_name"],
-                        "games":total_games,"colab":colab,"notes":notes,
-                        "all_keys":list(saved.keys())})
+                        "games":total_games,"colab":colab,"notes":notes})
     return jsonify({"trained":False})
 
 HTML = r"""<!DOCTYPE html>
