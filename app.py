@@ -276,6 +276,8 @@ OPENING_DB = {
     },
 }
 
+BLACK_OPENINGS = {'Aggressive': [{'name': 'Sicilian Defense: Najdorf', 'pgn': '1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 a6', 'moves': 'e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6', 'why': 'Sharpest Black reply to 1.e4 — leads to complex attacking positions', 'difficulty': 'Advanced', 'players': 'Fischer, Kasparov, Topalov', 'chesscom': 'https://www.chess.com/openings/Sicilian-Defense-Najdorf-Variation'}, {'name': "King's Indian Defense", 'pgn': '1.d4 Nf6 2.c4 g6 3.Nc3 Bg7 4.e4 d6 5.Nf3 O-O', 'moves': 'd4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3', 'why': "Black fianchettoes and counterattacks White's center — highly aggressive", 'difficulty': 'Advanced', 'players': 'Kasparov, Fischer, Bronstein', 'chesscom': 'https://www.chess.com/openings/Kings-Indian-Defense'}, {'name': 'Latvian Gambit', 'pgn': '1.e4 e5 2.Nf3 f5', 'moves': 'e4 e5 Nf3 f5', 'why': 'Extreme gambit — wild positions that shock opponents in blitz', 'difficulty': 'Intermediate', 'players': 'Shirov (fan)', 'chesscom': 'https://www.chess.com/openings/Latvian-Gambit'}], 'Classical': [{'name': 'Berlin Defense (Ruy Lopez)', 'pgn': '1.e4 e5 2.Nf3 Nc6 3.Bb5 Nf6', 'moves': 'e4 e5 Nf3 Nc6 Bb5 Nf6', 'why': 'Kramnik used this to beat Kasparov — solid classical counterplay', 'difficulty': 'Intermediate', 'players': 'Kramnik, Carlsen', 'chesscom': 'https://www.chess.com/openings/Ruy-Lopez-Opening-Berlin-Defense'}, {'name': "Petrov's Defense", 'pgn': '1.e4 e5 2.Nf3 Nf6', 'moves': 'e4 e5 Nf3 Nf6', 'why': "Symmetrical and solid — mirrors White's development perfectly", 'difficulty': 'Beginner', 'players': 'Petrov, Kramnik, Anand', 'chesscom': 'https://www.chess.com/openings/Petrovs-Defense'}, {'name': 'Two Knights Defense', 'pgn': '1.e4 e5 2.Nf3 Nc6 3.Bc4 Nf6', 'moves': 'e4 e5 Nf3 Nc6 Bc4 Nf6', 'why': 'Active and principled — fights for the center immediately', 'difficulty': 'Intermediate', 'players': 'Morphy, Tal', 'chesscom': 'https://www.chess.com/openings/Two-Knights-Defense'}], 'Strategic': [{'name': 'Nimzo-Indian Defense', 'pgn': '1.d4 Nf6 2.c4 e6 3.Nc3 Bb4', 'moves': 'd4 Nf6 c4 e6 Nc3 Bb4', 'why': 'Pins the knight and fights for e4 — rich positional play', 'difficulty': 'Advanced', 'players': 'Nimzowitsch, Karpov, Kasparov', 'chesscom': 'https://www.chess.com/openings/Nimzo-Indian-Defense'}, {'name': 'Grunfeld Defense', 'pgn': '1.d4 Nf6 2.c4 g6 3.Nc3 d5', 'moves': 'd4 Nf6 c4 g6 Nc3 d5', 'why': 'Gives White a big center, then attacks it with pieces — hypermodern masterpiece', 'difficulty': 'Advanced', 'players': 'Kasparov, Spassky', 'chesscom': 'https://www.chess.com/openings/Grunfeld-Defense'}, {'name': "Queen's Indian Defense", 'pgn': '1.d4 Nf6 2.c4 e6 3.Nf3 b6', 'moves': 'd4 Nf6 c4 e6 Nf3 b6', 'why': 'Flexible hypermodern setup — avoids early confrontation', 'difficulty': 'Intermediate', 'players': 'Karpov, Kramnik', 'chesscom': 'https://www.chess.com/openings/Queens-Indian-Defense'}], 'Solid': [{'name': 'Caro-Kann Defense', 'pgn': '1.e4 c6 2.d4 d5', 'moves': 'e4 c6 d4 d5', 'why': 'Rock-solid pawn structure with no early weaknesses', 'difficulty': 'Intermediate', 'players': 'Petrosian, Karpov, Short', 'chesscom': 'https://www.chess.com/openings/Caro-Kann-Defense'}, {'name': 'French Defense', 'pgn': '1.e4 e6 2.d4 d5', 'moves': 'e4 e6 d4 d5', 'why': 'Solid chain with long-term counterplay on the queenside', 'difficulty': 'Intermediate', 'players': 'Nimzowitsch, Uhlmann, Bareev', 'chesscom': 'https://www.chess.com/openings/French-Defense'}, {'name': 'Slav Defense', 'pgn': '1.d4 d5 2.c4 c6', 'moves': 'd4 d5 c4 c6', 'why': 'Extremely reliable — supports d5 without blocking the c8 bishop', 'difficulty': 'Intermediate', 'players': 'Kramnik, Anand, Leko', 'chesscom': 'https://www.chess.com/openings/Slav-Defense'}]}
+
 def get_family_from_moves(pgn_moves_str):
     """Detect opening family from the actual move sequence (first 10 plies).
     Returns a family string or None if undetermined."""
@@ -562,8 +564,10 @@ def recommend_for_user(username):
                   "draw_rate":round(agg["draw_rate"]*100,1),"avg_moves":round(agg["num_moves"],1),
                   "resign_rate":round(agg["resign_rate"]*100,1),"games_analyzed":len(df)}
     chosen_openings=pick_openings(pred, player_stats)
+    black_ops=BLACK_OPENINGS.get(pred,[])
     return {"username":username,"predicted_family":pred,"probabilities":probs,
             "openings":chosen_openings,
+            "black_openings":black_ops,
             "style_info":{"emoji":info["emoji"],"color":info["color"],"description":info["description"],"tip":info["tip"]},
             "player_stats":player_stats,
             "model_used":model_name,"model_accuracy":saved["results"].get(model_name,0)},None
@@ -804,6 +808,19 @@ input[type=text]::placeholder{color:var(--muted);}
   <div class="card"><div class="stitle">Style Probabilities</div><div class="prow" id="prow"></div></div>
   <div class="card"><div class="stitle">Top 3 Recommended Openings — with Interactive Board</div><div class="olist" id="olist"></div></div>
   <div id="mcredit"></div>
+
+  <!-- Black Openings Section -->
+  <div id="black-section" style="display:none">
+    <div class="card">
+      <div class="card-title" style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:24px">♟</span>
+        <span>Recommended Openings Playing as <span id="black-family-label" style="color:var(--gold)">Black</span></span>
+      </div>
+      <div class="card-sub">Based on your style, these Black responses suit your game best.</div>
+      <div class="olist" id="black-olist"></div>
+    </div>
+  </div>
+
 </div>
 </div>
 
@@ -1162,7 +1179,13 @@ function renderResult(d){
     for(let r=0;r<8;r++)for(let c=0;c<8;c++){
       const el=document.getElementById(`${pid}_${r}_${c}`);
       if(!el)continue;
-      el.textContent=state.board[r][c]?PC[state.board[r][c]]||'':'';
+      const p=state.board[r][c];
+      if(p&&PC[p]){
+        const cls=p[0]==='w'?'wp':'bp';
+        el.innerHTML=`<span class="${cls}">${PC[p]}</span>`;
+      } else {
+        el.innerHTML='';
+      }
       el.classList.remove('selected','lm','hint-sq');
       if(state.selected&&state.selected[0]===r&&state.selected[1]===c)
         el.classList.add('selected');
@@ -1193,29 +1216,36 @@ function renderResult(d){
     if(sq&&sq[0]===state.turn){state.selected=[r,c];renderPuzzleBoard(pid);highlightTargets(pid,r,c);return;}
 
     // Attempt a move
-    const FILES='abcdefgh';
+    const FILES2='abcdefgh';
     const piece=board[fr][fc];
-    // Build move notation
-    let moveStr='';
-    const toFile=FILES[c];
+    const toFile=FILES2[c];
     const toRank=(8-r).toString();
+    const toSq=toFile+toRank;
+    // Build multiple possible notations for the same move
+    const notations=[];
     if(piece[1]==='P'){
-      // pawn capture
-      if(fc!==c) moveStr=FILES[fc]+'x'+toFile+toRank;
-      else moveStr=toFile+toRank;
+      if(fc!==c){ // capture
+        notations.push(FILES2[fc]+'x'+toSq);
+        notations.push(FILES2[fc]+toSq);
+      } else {
+        notations.push(toSq);
+      }
     } else {
       const cap=board[r][c]?'x':'';
-      moveStr=piece[1]+cap+toFile+toRank;
+      notations.push(piece[1]+cap+toSq);
+      notations.push(piece[1]+toSq);
+      // With disambiguation
+      notations.push(piece[1]+FILES2[fc]+cap+toSq);
+      notations.push(piece[1]+(8-fr)+cap+toSq);
     }
-
-    // Check against answer (flexible: e4, Nf3, exf4, etc.)
-    const ans=state.answer.replace(/[+#]/g,'');
-    const attempt=moveStr.replace(/[+#]/g,'');
+    // Normalize answer for comparison
+    const ans=state.answer.replace(/[+#!=?x]/g,'').toLowerCase();
+    const matched=notations.some(n=>n.replace(/[+#!=?x]/g,'').toLowerCase()===ans);
 
     state.selected=null;
     state.attempts++;
 
-    if(attempt===ans||moveStr===state.answer){
+    if(matched){
       // CORRECT
       const newBoard=applyMove(board,state.answer,state.turn==='w');
       state.board=newBoard;
@@ -1360,6 +1390,47 @@ function renderResult(d){
 
   document.getElementById("mcredit").textContent=`Predicted by ${d.model_used} · ${d.model_accuracy}% accuracy`;
   document.getElementById("result").style.display="block";
+
+  // ── Black Openings ──
+  const blackOps = d.black_openings || [];
+  if(blackOps.length > 0){
+    document.getElementById("black-family-label").textContent = d.predicted_family;
+    document.getElementById("black-section").style.display="block";
+    document.getElementById("black-olist").innerHTML = blackOps.map((o,i)=>{
+      const bid = `bboard_${i}`;
+      return `
+      <div class="ocard" style="border-top:3px solid ${col};margin-bottom:16px;">
+        <div class="oinfo">
+          <div class="orank" style="color:var(--muted)">#${i+1} AS BLACK</div>
+          <div class="oname">${o.name}</div>
+          <div class="opgn">${o.pgn}</div>
+          <div class="owhy">${o.why}</div>
+          <div class="ometa">
+            <strong>Difficulty:</strong> ${o.difficulty} &nbsp;·&nbsp;
+            <strong>Famous players:</strong> ${o.players}
+          </div>
+          <div class="octa" style="margin-top:12px;">
+            <a href="${o.chesscom||'https://chess.com'}" target="_blank" class="btn btn-chesscom">♟ Study on Chess.com</a>
+          </div>
+        </div>
+        <div class="bwrap">
+          ${buildBoardHTML(bid)}
+          <div class="mctr" id="${bid}_ctr"></div>
+          <div class="bcontrols">
+            <button class="bbtn" onclick="resetBoard('${bid}')">⏮ Start</button>
+            <button class="bbtn" onclick="stepMove('${bid}',-1)">◀</button>
+            <button class="bbtn" onclick="playAll('${bid}')">▶ Play</button>
+            <button class="bbtn" onclick="stepMove('${bid}',1)">▶|</button>
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+
+    setTimeout(()=>{
+      blackOps.forEach((o,i)=>initOpeningBoard(`bboard_${i}`, o.moves));
+    }, 100);
+  }
+
   document.getElementById("result").scrollIntoView({behavior:"smooth"});
 }
 </script>
