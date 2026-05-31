@@ -647,6 +647,19 @@ def run_training():
         training_state["error"]=f"Unexpected error: {str(e)}"
         training_state["logs"].append(f"💥 {traceback.format_exc()}")
 
+@app.route("/api/debug/pkl")
+def api_debug_pkl():
+    """Shows pkl keys and scalar values — helps diagnose Colab model format."""
+    if not os.path.exists("best_model.pkl"):
+        return jsonify({"error":"No pkl found"})
+    with open("best_model.pkl","rb") as f: saved=pickle.load(f)
+    info={}
+    for k,v in saved.items():
+        if isinstance(v,(str,int,float,bool)): info[k]=v
+        elif isinstance(v,dict): info[k]=f"dict with {len(v)} keys: {list(v.keys())[:5]}"
+        else: info[k]=str(type(v))
+    return jsonify(info)
+
 @app.route("/")
 def index(): return render_template_string(HTML)
 @app.route("/api/train",methods=["POST"])
@@ -682,9 +695,11 @@ def api_model_status():
                 clean_results[k] = round(val * 100 if val <= 1.0 else val, 1)
             else:
                 clean_results[k] = 0.0
-        total_games = int(saved.get("total_games", 0))
+        # Colab may store game count under different keys
+        total_games = int(saved.get("total_games") or saved.get("num_games") or saved.get("n_games") or saved.get("game_count") or 0)
         return jsonify({"trained":True,"results":clean_results,"best":saved["model_name"],
-                        "games":total_games,"colab":colab,"notes":notes})
+                        "games":total_games,"colab":colab,"notes":notes,
+                        "all_keys":list(saved.keys())})
     return jsonify({"trained":False})
 
 HTML = r"""<!DOCTYPE html>
@@ -933,17 +948,22 @@ function removeHighlights(pid) {
 
 function highlightMoves(pid, square, game) {
   removeHighlights(pid);
-  const moves = game.moves({ square, verbose: true });
+  const moves = game.moves({ square: square, verbose: true });
   if (!moves.length) return;
-  // Highlight the source square
-  $(`#${pid} .square-${square}`).css('background', 'rgba(100,180,255,0.5)');
-  // Add dots on target squares
+  // Highlight source square
+  $(`#${pid} .square-${square}`).css('background', 'rgba(100,180,255,0.45)');
+  // Dots on target squares
   moves.forEach(m => {
-    const hasPiece = game.get(m.to);
-    const dot = hasPiece
-      ? `<div class="dot-hint" style="position:absolute;inset:0;border-radius:50%;border:4px solid rgba(0,0,0,0.35);pointer-events:none;z-index:10"></div>`
-      : `<div class="dot-hint" style="position:absolute;top:50%;left:50%;width:28%;height:28%;transform:translate(-50%,-50%);border-radius:50%;background:rgba(0,0,0,0.25);pointer-events:none;z-index:10"></div>`;
-    $(`#${pid} .square-${m.to}`).css('position','relative').append(dot);
+    const hasPiece = !!game.get(m.to);
+    const $sq = $(`#${pid} .square-${m.to}`);
+    $sq.css('position', 'relative');
+    if (hasPiece) {
+      // Ring around capture square
+      $sq.append(`<div class="dot-hint" style="position:absolute;inset:3px;border-radius:50%;border:3px solid rgba(0,0,0,0.38);pointer-events:none;z-index:10;box-sizing:border-box"></div>`);
+    } else {
+      // Filled dot on empty square
+      $sq.append(`<div class="dot-hint" style="position:absolute;top:50%;left:50%;width:30%;height:30%;transform:translate(-50%,-50%);border-radius:50%;background:rgba(0,0,0,0.28);pointer-events:none;z-index:10"></div>`);
+    }
   });
 }
 
@@ -953,6 +973,8 @@ function initPuzzleBoard(pid, fen, answer) {
   const el = document.getElementById(pid);
   if (!el) return;
 
+  // chessboard.js v1 onMouseoverSquare only passes (square), not (square, piece)
+  // We look up the piece from game ourselves
   const board = Chessboard(pid, {
     position: fen,
     pieceTheme: 'https://raw.githubusercontent.com/oakmac/chessboardjs/master/website/img/chesspieces/wikipedia/{piece}.png',
@@ -965,11 +987,14 @@ function initPuzzleBoard(pid, fen, answer) {
       if (game.turn() === 'b' && piece.search(/^w/) !== -1) return false;
       highlightMoves(pid, src, game);
     },
-    onMouseoverSquare: (square, piece) => {
+    onMouseoverSquare: (square) => {
       const state = PBOARDS[pid];
-      if (!state || state.solved || !piece) return;
-      if (game.turn() === 'w' && piece.search(/^b/) !== -1) return;
-      if (game.turn() === 'b' && piece.search(/^w/) !== -1) return;
+      if (!state || state.solved) return;
+      const piece = game.get(square);
+      if (!piece) return;
+      // Only show dots for the side whose turn it is
+      if (game.turn() === 'w' && piece.color !== 'w') return;
+      if (game.turn() === 'b' && piece.color !== 'b') return;
       highlightMoves(pid, square, game);
     },
     onMouseoutSquare: () => { removeHighlights(pid); },
@@ -1047,8 +1072,8 @@ function buildBoardHTML(id, size=280) {
   return `<div id="${id}" style="width:${size}px"></div>`;
 }
 
-function buildPuzzleBoard(pid, size=260) {
-  return `<div id="${pid}" style="width:${size}px;cursor:grab"></div>`;
+function buildPuzzleBoard(pid, size=260, fen='', answer='') {
+  return `<div id="${pid}" class="${fen?'pboard-lazy':''}" data-pid="${pid}" data-fen="${fen}" data-answer="${answer}" style="width:${size}px;cursor:grab"></div>`;
 }
 
 // ═══════════════════════════════════════════════════
@@ -1088,7 +1113,19 @@ function pollTraining(){
     const st=await fetch("/api/train/status").then(x=>x.json());
     lb.innerHTML=st.logs.map(l=>`<p class="${l.startsWith('✅')?'ok':''}">${l}</p>`).join("");
     lb.scrollTop=lb.scrollHeight;
-    if(st.status==="done"){clearInterval(iv);showMR(st.result.model_results,st.result.best_model,st.result.total_games,false,"");document.getElementById("train-btn").innerHTML="Re-train";document.getElementById("train-btn").disabled=false;}
+    if(st.status==="done"){
+      clearInterval(iv);
+      // Normalise raw results from in-app training (floats 0-100, but failed models=0.0)
+      const raw=st.result.model_results||{};
+      const cleaned={};
+      Object.entries(raw).forEach(([n,v])=>{
+        const num=typeof v==="number"?v:parseFloat(v)||0;
+        cleaned[n]=num<=1?Math.round(num*1000)/10:Math.round(num*10)/10;
+      });
+      showMR(cleaned,st.result.best_model,st.result.total_games,false,"");
+      document.getElementById("train-btn").innerHTML="Re-train";
+      document.getElementById("train-btn").disabled=false;
+    }
     if(st.status==="error"){clearInterval(iv);lb.innerHTML+=`<p style="color:#e85d3a">❌ ${st.error}</p>`;document.getElementById("train-btn").innerHTML="Retry";document.getElementById("train-btn").disabled=false;}
   },1500);
 }
@@ -1108,7 +1145,7 @@ function showMR(results,best,totalGames,colab,notes){
   document.getElementById("mgrid").innerHTML=entries.map(([n,acc])=>`
     <div class="mc ${n===best?'best':''}">
       <div><div class="mcn">${n}</div>${n===best?'<div class="bbadge">⭐ Best</div>':''}</div>
-      <div class="mca" style="color:${acc>=70?'#2ecc71':acc>=55?'#c9a84c':'#e85d3a'}">${acc}%</div>
+      <div class="mca" style="color:${acc===0?'#555':acc>=70?'#2ecc71':acc>=55?'#c9a84c':'#e85d3a'}">${acc===0?'Failed':acc+'%'}</div>
     </div>`).join("");
   document.getElementById("mresults").style.display="block";
 }
@@ -1130,6 +1167,21 @@ function switchTab(btn, showId, hideId){
   document.getElementById(hideId).style.display='none';
   btn.parentElement.querySelectorAll('.otab').forEach(t=>t.classList.remove('active'));
   btn.classList.add('active');
+  // Lazy-init any puzzle boards inside the newly shown panel
+  const panel = document.getElementById(showId);
+  if (panel) {
+    panel.querySelectorAll('.pboard-lazy').forEach(el => {
+      const pid = el.dataset.pid;
+      const fen = el.dataset.fen;
+      const ans = el.dataset.answer;
+      if (pid && fen && ans && !PBOARDS[pid]) {
+        el.classList.remove('pboard-lazy');
+        initPuzzleBoard(pid, fen, ans);
+        // Force chessboard.js to recalculate size
+        setTimeout(() => { if (PBOARDS[pid]) PBOARDS[pid].board.resize(); }, 50);
+      }
+    });
+  }
 }
 
 function renderResult(d){
@@ -1365,7 +1417,7 @@ function renderResult(d){
       <div class="pcard">
         <div class="pnum">Puzzle ${pi+1} of ${puzzles.length}</div>
         <div class="pprompt">${pz.prompt}</div>
-        <div class="pboard-wrap">${buildPuzzleBoard(pid, 240)}</div>
+        <div class="pboard-wrap">${buildPuzzleBoard(pid, 240, pz.fen, pz.answer)}</div>
         <div class="pfeedback" id="${pid}_feedback">
           <span style="color:var(--muted)">Your turn — drag a piece to move</span>
         </div>
@@ -1424,19 +1476,13 @@ function renderResult(d){
     renderOpeningCard(o, i, 'b', '⬛ PLAYING AS BLACK', col)
   ).join('');
 
-  // Init all boards after DOM renders
+  // Init opening boards — puzzle boards init lazily when tab is clicked
   setTimeout(() => {
     d.openings.forEach((o, i) => {
-      initOpeningBoard(`w_board_${i}`, o.moves);
-      (o.puzzles || []).forEach((pz, pi) => {
-        initPuzzleBoard(`w_pz_${i}_${pi}`, pz.fen, pz.answer);
-      });
+      initOpeningBoard(`w_board_${i}`, o.moves, 'white');
     });
     blackOps.forEach((o, i) => {
       initOpeningBoard(`b_board_${i}`, o.moves, 'black');
-      (o.puzzles || []).forEach((pz, pi) => {
-        initPuzzleBoard(`b_pz_${i}_${pi}`, pz.fen, pz.answer);
-      });
     });
   }, 150);
 
