@@ -466,12 +466,18 @@ def train_models(records, progress_cb=None):
     scaler=StandardScaler(); Xtr_s=scaler.fit_transform(X_train); Xte_s=scaler.transform(X_test)
 
     # ── Lab 3/4/5/6/7: Fast supervised models ──
+    from sklearn.neural_network import MLPClassifier
+    # Clean scaled arrays to prevent MLPClassifier NaN crash
+    import numpy as _np
+    Xtr_s = _np.clip(_np.nan_to_num(_np.array(Xtr_s,dtype=_np.float64),nan=0.0,posinf=0.0,neginf=0.0),-10,10)
+    Xte_s = _np.clip(_np.nan_to_num(_np.array(Xte_s,dtype=_np.float64),nan=0.0,posinf=0.0,neginf=0.0),-10,10)
     mdls={
         "Naive Bayes":    (GaussianNB(), True),
         "Decision Tree":  (DecisionTreeClassifier(max_depth=6,random_state=42), False),
         "Random Forest":  (RandomForestClassifier(n_estimators=50,random_state=42,n_jobs=-1), False),
         "Logistic Reg":   (LogisticRegression(max_iter=300,random_state=42), True),
         "SVM Linear":     (SVC(kernel="linear",C=1.0,probability=True,random_state=42,max_iter=2000), True),
+        "Neural Network": (MLPClassifier(hidden_layer_sizes=(128,64),activation="relu",max_iter=300,random_state=42,early_stopping=True,validation_fraction=0.1), True),
     }
     results={}; best_acc,best_name,best_model=0,None,None
     for name,(model,scaled) in mdls.items():
@@ -656,7 +662,10 @@ def api_recommend():
 def api_model_status():
     if os.path.exists("best_model.pkl"):
         with open("best_model.pkl","rb") as f: saved=pickle.load(f)
-        return jsonify({"trained":True,"results":saved["results"],"best":saved["model_name"],"games":saved["total_games"]})
+        colab = saved.get("trained_on_colab", False)
+        notes = saved.get("colab_notes", "")
+        return jsonify({"trained":True,"results":saved["results"],"best":saved["model_name"],
+                        "games":saved["total_games"],"colab":colab,"notes":notes})
     return jsonify({"trained":False})
 
 HTML = r"""<!DOCTYPE html>
@@ -1005,7 +1014,7 @@ const COLORS={Aggressive:"#e85d3a",Classical:"#3a7bd5",Strategic:"#2ecc71",Solid
 
 window.onload=async()=>{
   const r=await fetch("/api/model/status").then(x=>x.json());
-  if(r.trained)showMR(r.results,r.best,r.games);
+  if(r.trained)showMR(r.results,r.best,r.games,r.colab,r.notes);
 };
 
 async function startTraining(){
@@ -1035,15 +1044,16 @@ function pollTraining(){
     const st=await fetch("/api/train/status").then(x=>x.json());
     lb.innerHTML=st.logs.map(l=>`<p class="${l.startsWith('✅')?'ok':''}">${l}</p>`).join("");
     lb.scrollTop=lb.scrollHeight;
-    if(st.status==="done"){clearInterval(iv);showMR(st.result.model_results,st.result.best_model,st.result.total_games);document.getElementById("train-btn").innerHTML="Re-train";document.getElementById("train-btn").disabled=false;}
+    if(st.status==="done"){clearInterval(iv);showMR(st.result.model_results,st.result.best_model,st.result.total_games,false,"");document.getElementById("train-btn").innerHTML="Re-train";document.getElementById("train-btn").disabled=false;}
     if(st.status==="error"){clearInterval(iv);lb.innerHTML+=`<p style="color:#e85d3a">❌ ${st.error}</p>`;document.getElementById("train-btn").innerHTML="Retry";document.getElementById("train-btn").disabled=false;}
   },1500);
 }
 
-function showMR(results,best,totalGames){
+function showMR(results,best,totalGames,colab,notes){
   document.getElementById("sbar").className="sbar ok";
   document.getElementById("sdot").classList.remove("pulse");
-  document.getElementById("stext").textContent=`✓ Ready · ${totalGames} games · Best model: ${best}`;
+  const colabBadge = colab ? ' 🎓 Colab-trained' : '';
+  document.getElementById("stext").textContent=`✓ Ready · ${totalGames.toLocaleString()} games · Best model: ${best}${colabBadge}`;
   document.getElementById("mgrid").innerHTML=Object.entries(results).sort((a,b)=>b[1]-a[1]).map(([n,acc])=>`
     <div class="mc ${n===best?'best':''}">
       <div><div class="mcn">${n}</div>${n===best?'<div class="bbadge">⭐ Best</div>':''}</div>
@@ -1116,11 +1126,40 @@ function renderResult(d){
   }
 
   function initPuzzleBoard(pid, fen, answer){
-    const board=loadFEN(fen);
-    // Determine whose turn from FEN
-    const turn=(fen.split(' ')[1]||'w');
-    PZ[pid]={board, answer, turn, selected:null, solved:false, attempts:0};
-    renderPuzzleBoard(pid);
+    // Use chessboard.js for puzzles — same as opening boards
+    const el=document.getElementById(pid); if(!el)return;
+    const game=new Chess(fen);
+    const turn=game.turn();
+    const board=Chessboard(pid,{
+      position:fen,
+      pieceTheme:'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/{piece}.png',
+      draggable:true,
+      orientation:turn==='w'?'white':'black',
+      onDragStart:(src,piece)=>{
+        const s=PBOARDS[pid]; if(!s||s.solved)return false;
+        if(game.turn()==='w'&&piece.search(/^b/)!==-1)return false;
+        if(game.turn()==='b'&&piece.search(/^w/)!==-1)return false;
+      },
+      onDrop:(src,tgt)=>{
+        const s=PBOARDS[pid]; if(!s||s.solved)return 'snapback';
+        const move=game.move({from:src,to:tgt,promotion:'q'});
+        if(move===null)return 'snapback';
+        const ans=answer.replace(/[+#]/g,'');
+        const san=move.san.replace(/[+#]/g,'');
+        const uci=src+tgt;
+        const allMoves=new Chess(fen).moves({verbose:true});
+        const ansMove=allMoves.find(m=>m.san.replace(/[+#]/g,'')===ans);
+        const ansUci=ansMove?ansMove.from+ansMove.to:'';
+        if(san===ans||uci===ansUci||san.replace(/x/g,'')===ans.replace(/x/g,'')){
+          s.solved=true; board.position(game.fen());
+          showPuzzleFeedback(pid,'correct');
+        } else {
+          game.undo(); showPuzzleFeedback(pid,'wrong'); return 'snapback';
+        }
+      },
+      onSnapEnd:()=>{board.position(game.fen());}
+    });
+    PBOARDS[pid]={board,game,answer,fen,solved:false};
   }
 
   function renderPuzzleBoard(pid){
@@ -1234,35 +1273,29 @@ function renderResult(d){
       el.innerHTML='<span style="color:#2ecc71;font-size:15px">✅ Correct! Well played.</span>';
     } else {
       el.innerHTML='<span style="color:#e85d3a;font-size:15px">❌ Wrong move — try again!</span>';
-      setTimeout(()=>{if(!PZ[pid].solved)el.innerHTML=el.innerHTML.replace('❌ Wrong move — try again!','💭 Keep trying...');},2000);
+      setTimeout(()=>{const s=PBOARDS[pid];if(el&&s&&!s.solved)el.innerHTML='<span style="color:var(--muted)">💭 Keep trying...</span>';},2000);
     }
   }
 
   function buildPuzzleBoard(pid){
-    let h=`<div class="cboard" id="${pid}" style="cursor:pointer">`;
-    for(let r=0;r<8;r++)for(let c=0;c<8;c++){
-      const light=(r+c)%2===0;
-      h+=`<div class="sq ${light?'light':'dark'}" id="${pid}_${r}_${c}" onclick="puzzleSquareClick('${pid}',${r},${c})"></div>`;
-    }
-    return h+'</div>';
+    return `<div id="${pid}" style="width:260px"></div>`;
   }
 
   function resetPuzzle(pid, fenOrEl, answer){
-    const fen = (typeof fenOrEl === 'string') ? fenOrEl : fenOrEl;
-    initPuzzleBoard(pid,fen,answer);
+    const state=PBOARDS[pid]; if(!state)return;
+    state.game=new Chess(state.fen);
+    state.solved=false;
+    state.board.position(state.fen);
     const fb=document.getElementById(`${pid}_feedback`);
-    if(fb)fb.innerHTML='<span style="color:var(--muted)">Your turn — click a piece to move</span>';
+    if(fb)fb.innerHTML='<span style="color:var(--muted)">Your turn — drag a piece to move</span>';
   }
 
   function revealPuzzleAnswer(pid, answer){
+    const state=PBOARDS[pid]; if(!state)return;
+    const move=state.game.move(answer,{sloppy:true});
+    if(move){state.board.position(state.game.fen());state.solved=true;}
     const fb=document.getElementById(`${pid}_feedback`);
     if(fb)fb.innerHTML=`<span style="color:var(--gold)">💡 Answer: <strong>${answer}</strong></span>`;
-    if(PZ[pid]){
-      const state=PZ[pid];
-      const newBoard=applyMove(state.board,answer,state.turn==='w');
-      state.board=newBoard; state.solved=true;
-      renderPuzzleBoard(pid);
-    }
   }
 
   // ═══════════════════════════════════════════
