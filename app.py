@@ -833,10 +833,26 @@ input[type=text]::placeholder{color:var(--muted);}
 </header>
 
 <div class="card">
-  <div class="card-title">Step 1 — Train the Model</div>
-  <div class="card-sub">Fetches real games from Chess.com's free public API and trains 4 ML models (Decision Tree, Random Forest, Naive Bayes, SVM). Takes ~2 minutes.</div>
-  <div id="sbar" class="sbar warn"><div class="dot" id="sdot"></div><span id="stext">Model not trained yet</span></div>
-  <button class="btn btn-gold" id="train-btn" onclick="startTraining()">Train Model</button>
+  <div class="card-title">Step 1 — Model Status</div>
+  <div class="card-sub" id="card-sub">Loading model status...</div>
+  <div id="sbar" class="sbar warn"><div class="dot" id="sdot"></div><span id="stext">Checking model...</span></div>
+
+  <!-- Colab model info panel — shown when Colab model is loaded -->
+  <div id="colab-panel" style="display:none;background:rgba(46,204,113,0.06);border:1px solid rgba(46,204,113,0.2);border-radius:12px;padding:18px;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <span style="font-size:22px">🎓</span>
+      <span style="font-family:'Playfair Display',serif;font-size:17px;font-weight:700;color:#2ecc71">Colab-Trained Model Active</span>
+    </div>
+    <div id="colab-notes" style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+      <span style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;">Want to retrain with live data?</span>
+      <button class="btn" id="train-btn" onclick="confirmRetrain()" style="background:rgba(255,255,255,0.07);color:var(--muted);font-size:12px;padding:6px 14px;border:1px solid var(--border)">⚠ Re-train (overwrites Colab model)</button>
+    </div>
+  </div>
+
+  <!-- Standard train button — shown when no Colab model -->
+  <button class="btn btn-gold" id="train-btn-main" onclick="startTraining()" style="display:none">Train Model</button>
+
   <div id="tprog" style="display:none;margin-top:16px;"><div class="logbox" id="logbox"></div></div>
   <div id="mresults" style="display:none;margin-top:20px;">
     <div class="stitle" style="margin-bottom:10px;">Model Comparison</div>
@@ -1087,12 +1103,37 @@ const COLORS={Aggressive:"#e85d3a",Classical:"#3a7bd5",Strategic:"#2ecc71",Solid
 
 window.onload=async()=>{
   const r=await fetch("/api/model/status").then(x=>x.json());
-  if(r.trained)showMR(r.results,r.best,r.games,r.colab,r.notes);
+  if(r.trained){
+    showMR(r.results,r.best,r.games,r.colab,r.notes);
+    if(r.colab){
+      // Show the Colab panel, hide the plain train button
+      document.getElementById("colab-panel").style.display="block";
+      document.getElementById("train-btn-main").style.display="none";
+      document.getElementById("card-sub").textContent="A high-quality Colab-trained model is active. Jump straight to Step 2.";
+      document.getElementById("colab-notes").textContent=r.notes||"Colab-trained model loaded.";
+    } else {
+      document.getElementById("colab-panel").style.display="none";
+      document.getElementById("train-btn-main").style.display="inline-flex";
+      document.getElementById("train-btn-main").textContent="Re-train";
+      document.getElementById("card-sub").textContent="Model trained on live Chess.com data. You can re-train to refresh.";
+    }
+  } else {
+    document.getElementById("colab-panel").style.display="none";
+    document.getElementById("train-btn-main").style.display="inline-flex";
+    document.getElementById("card-sub").textContent="Fetches real games from Chess.com\'s free public API and trains 6 ML models. Takes ~2 minutes.";
+  }
 };
 
+function confirmRetrain(){
+  if(confirm("⚠️ This will overwrite your Colab-trained 55k model with a smaller in-app trained model (~8k games, 100% accuracy due to overfitting).\n\nAre you sure you want to re-train?")){
+    startTraining();
+  }
+}
+
 async function startTraining(){
-  const btn=document.getElementById("train-btn");
-  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Training...';
+  const btn=document.getElementById("train-btn-main")||document.getElementById("train-btn");
+  if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Training...';}
+  document.getElementById("colab-panel").style.display="none";
   document.getElementById("tprog").style.display="block";
   document.getElementById("sbar").className="sbar warn";
   document.getElementById("stext").textContent="Training in progress...";
@@ -1127,10 +1168,10 @@ function pollTraining(){
         cleaned[n]=num<=1?Math.round(num*1000)/10:Math.round(num*10)/10;
       });
       showMR(cleaned,st.result.best_model,st.result.total_games,false,"");
-      document.getElementById("train-btn").innerHTML="Re-train";
-      document.getElementById("train-btn").disabled=false;
+      const tb=document.getElementById("train-btn-main")||document.getElementById("train-btn");
+      if(tb){tb.innerHTML="Re-train";tb.disabled=false;tb.style.display="inline-flex";}
     }
-    if(st.status==="error"){clearInterval(iv);lb.innerHTML+=`<p style="color:#e85d3a">❌ ${st.error}</p>`;document.getElementById("train-btn").innerHTML="Retry";document.getElementById("train-btn").disabled=false;}
+    if(st.status==="error"){clearInterval(iv);lb.innerHTML+=`<p style="color:#e85d3a">❌ ${st.error}</p>`;const tb2=document.getElementById("train-btn-main")||document.getElementById("train-btn");if(tb2){tb2.innerHTML="Retry";tb2.disabled=false;tb2.style.display="inline-flex";}}
   },1500);
 }
 
