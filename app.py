@@ -668,8 +668,23 @@ def api_model_status():
         with open("best_model.pkl","rb") as f: saved=pickle.load(f)
         colab = saved.get("trained_on_colab", False)
         notes = saved.get("colab_notes", "")
-        return jsonify({"trained":True,"results":saved["results"],"best":saved["model_name"],
-                        "games":saved["total_games"],"colab":colab,"notes":notes})
+        raw_results = saved.get("results", {})
+        clean_results = {}
+        for k, v in raw_results.items():
+            if isinstance(v, dict):
+                num = v.get("accuracy") or v.get("acc") or v.get("test_accuracy")
+                if num is None:
+                    nums = [x for x in v.values() if isinstance(x, (int, float))]
+                    num = nums[0] if nums else 0.0
+                clean_results[k] = round(float(num) * 100 if float(num) <= 1.0 else float(num), 1)
+            elif isinstance(v, (int, float)):
+                val = float(v)
+                clean_results[k] = round(val * 100 if val <= 1.0 else val, 1)
+            else:
+                clean_results[k] = 0.0
+        total_games = int(saved.get("total_games", 0))
+        return jsonify({"trained":True,"results":clean_results,"best":saved["model_name"],
+                        "games":total_games,"colab":colab,"notes":notes})
     return jsonify({"trained":False})
 
 HTML = r"""<!DOCTYPE html>
@@ -851,7 +866,7 @@ const BOARDS = {};   // opening boards  { id: {board, game, moves, idx} }
 const PBOARDS = {};  // puzzle boards    { pid: {board, game, answer, solved} }
 
 // ── Opening board: step through moves ──
-function initOpeningBoard(id, movesStr) {
+function initOpeningBoard(id, movesStr, orientation='white') {
   const moves = movesStr.trim().split(/\s+/).filter(m => m && !/^\d+\./.test(m));
   const game = new Chess();
   const el = document.getElementById(id);
@@ -861,6 +876,7 @@ function initOpeningBoard(id, movesStr) {
     pieceTheme: 'https://raw.githubusercontent.com/oakmac/chessboardjs/master/website/img/chesspieces/wikipedia/{piece}.png',
     draggable: false,
     showNotation: true,
+    orientation: orientation,
   });
   // Pre-compute positions
   const positions = ['start'];
@@ -909,10 +925,31 @@ function updateBoardCtr(id) {
   }
 }
 
-// ── Puzzle board: fully interactive drag-and-drop ──
+// ── Puzzle board: fully interactive drag-and-drop with move dots ──
+function removeHighlights(pid) {
+  $(`#${pid} .square-55d63`).css('background', '');
+  $(`#${pid} .dot-hint`).remove();
+}
+
+function highlightMoves(pid, square, game) {
+  removeHighlights(pid);
+  const moves = game.moves({ square, verbose: true });
+  if (!moves.length) return;
+  // Highlight the source square
+  $(`#${pid} .square-${square}`).css('background', 'rgba(100,180,255,0.5)');
+  // Add dots on target squares
+  moves.forEach(m => {
+    const hasPiece = game.get(m.to);
+    const dot = hasPiece
+      ? `<div class="dot-hint" style="position:absolute;inset:0;border-radius:50%;border:4px solid rgba(0,0,0,0.35);pointer-events:none;z-index:10"></div>`
+      : `<div class="dot-hint" style="position:absolute;top:50%;left:50%;width:28%;height:28%;transform:translate(-50%,-50%);border-radius:50%;background:rgba(0,0,0,0.25);pointer-events:none;z-index:10"></div>`;
+    $(`#${pid} .square-${m.to}`).css('position','relative').append(dot);
+  });
+}
+
 function initPuzzleBoard(pid, fen, answer) {
   const game = new Chess(fen);
-  const turn = game.turn(); // 'w' or 'b'
+  const turn = game.turn();
   const el = document.getElementById(pid);
   if (!el) return;
 
@@ -924,32 +961,35 @@ function initPuzzleBoard(pid, fen, answer) {
     onDragStart: (src, piece) => {
       const state = PBOARDS[pid];
       if (!state || state.solved) return false;
-      // Only allow dragging the correct color
-      if ((game.turn() === 'w' && piece.search(/^b/) !== -1)) return false;
-      if ((game.turn() === 'b' && piece.search(/^w/) !== -1)) return false;
+      if (game.turn() === 'w' && piece.search(/^b/) !== -1) return false;
+      if (game.turn() === 'b' && piece.search(/^w/) !== -1) return false;
+      highlightMoves(pid, src, game);
     },
+    onMouseoverSquare: (square, piece) => {
+      const state = PBOARDS[pid];
+      if (!state || state.solved || !piece) return;
+      if (game.turn() === 'w' && piece.search(/^b/) !== -1) return;
+      if (game.turn() === 'b' && piece.search(/^w/) !== -1) return;
+      highlightMoves(pid, square, game);
+    },
+    onMouseoutSquare: () => { removeHighlights(pid); },
     onDrop: (src, tgt) => {
+      removeHighlights(pid);
       const state = PBOARDS[pid];
       if (!state || state.solved) return 'snapback';
-
-      // Try the move
       const move = game.move({ from: src, to: tgt, promotion: 'q' });
       if (move === null) return 'snapback';
-
-      // Check if it matches the answer
       const ans = state.answer.replace(/[+#]/g, '');
       const moveStr = move.san.replace(/[+#]/g, '');
       const moveUCI = src + tgt;
       const ansNorm = ans.toLowerCase().replace(/x/g, '');
       const movNorm = moveStr.toLowerCase().replace(/x/g, '');
       const uciNorm = ansUCI(ans, game);
-
       if (movNorm === ansNorm || moveUCI === uciNorm || moveStr === state.answer.replace(/[+#]/g,'')) {
         state.solved = true;
         board.position(game.fen());
         showPuzzleFeedback(pid, 'correct');
       } else {
-        // Wrong — undo and snap back
         game.undo();
         showPuzzleFeedback(pid, 'wrong');
         return 'snapback';
@@ -1057,8 +1097,15 @@ function showMR(results,best,totalGames,colab,notes){
   document.getElementById("sbar").className="sbar ok";
   document.getElementById("sdot").classList.remove("pulse");
   const colabBadge = colab ? ' 🎓 Colab-trained' : '';
-  document.getElementById("stext").textContent=`✓ Ready · ${totalGames.toLocaleString()} games · Best model: ${best}${colabBadge}`;
-  document.getElementById("mgrid").innerHTML=Object.entries(results).sort((a,b)=>b[1]-a[1]).map(([n,acc])=>`
+  document.getElementById("stext").textContent=`✓ Ready · ${Number(totalGames).toLocaleString()} games · Best model: ${best}${colabBadge}`;
+  // Server normalises to floats, but guard against any leftover nested format
+  function safeAcc(v){
+    if(typeof v==='number') return v<=1?Math.round(v*1000)/10:Math.round(v*10)/10;
+    if(typeof v==='object'&&v!==null){const n=v.accuracy??v.acc??v.test_accuracy??Object.values(v)[0];return safeAcc(n||0);}
+    return Math.round((parseFloat(v)||0)*10)/10;
+  }
+  const entries=Object.entries(results).map(([n,v])=>[n,safeAcc(v)]).sort((a,b)=>b[1]-a[1]);
+  document.getElementById("mgrid").innerHTML=entries.map(([n,acc])=>`
     <div class="mc ${n===best?'best':''}">
       <div><div class="mcn">${n}</div>${n===best?'<div class="bbadge">⭐ Best</div>':''}</div>
       <div class="mca" style="color:${acc>=70?'#2ecc71':acc>=55?'#c9a84c':'#e85d3a'}">${acc}%</div>
@@ -1386,7 +1433,7 @@ function renderResult(d){
       });
     });
     blackOps.forEach((o, i) => {
-      initOpeningBoard(`b_board_${i}`, o.moves);
+      initOpeningBoard(`b_board_${i}`, o.moves, 'black');
       (o.puzzles || []).forEach((pz, pi) => {
         initPuzzleBoard(`b_pz_${i}_${pi}`, pz.fen, pz.answer);
       });
