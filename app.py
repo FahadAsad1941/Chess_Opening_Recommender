@@ -484,10 +484,14 @@ def train_models(records, progress_cb=None):
         t0=time.time()
         if progress_cb: progress_cb(f"🤖 Training {name}...")
         Xtr=Xtr_s if scaled else X_train; Xte=Xte_s if scaled else X_test
-        model.fit(Xtr,y_train); acc=accuracy_score(y_test,model.predict(Xte))
-        results[name]=round(acc*100,1)
-        if progress_cb: progress_cb(f"  ✓ {name}: {round(acc*100,1)}% ({round(time.time()-t0,1)}s)")
-        if acc>best_acc: best_acc,best_name,best_model=acc,name,model
+        try:
+            model.fit(Xtr,y_train); acc=accuracy_score(y_test,model.predict(Xte))
+            results[name]=round(acc*100,1)
+            if progress_cb: progress_cb(f"  ✓ {name}: {round(acc*100,1)}% ({round(time.time()-t0,1)}s)")
+            if acc>best_acc: best_acc,best_name,best_model=acc,name,model
+        except Exception as e:
+            if progress_cb: progress_cb(f"  ⚠ {name} skipped: {str(e)[:80]}")
+            results[name]=0.0
     rf=mdls["Random Forest"][0]
     importances={f:round(float(v),4) for f,v in zip(feats,rf.feature_importances_)}
     saved={"model":best_model,"model_name":best_name,"scaler":scaler,"features":feats,
