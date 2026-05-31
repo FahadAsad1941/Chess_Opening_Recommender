@@ -772,6 +772,11 @@ input[type=text]::placeholder{color:var(--muted);}
 @media(max-width:700px){.ocard{grid-template-columns:1fr;}.mgrid{grid-template-columns:1fr;}.srow{grid-template-columns:1fr 1fr;}}
 .puzzle-panel{width:100%;padding:12px 0;overflow-y:auto;}
 </style>
+<!-- Chessboard.js + Chess.js for real interactive boards -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -825,232 +830,177 @@ input[type=text]::placeholder{color:var(--muted);}
 </div>
 
 <script>
-// ═══════════════════════════════════
-//  CHESS ENGINE
-// ═══════════════════════════════════
-const PC={wK:'♔',wQ:'♕',wR:'♖',wB:'♗',wN:'♘',wP:'♙',bK:'♚',bQ:'♛',bR:'♜',bB:'♝',bN:'♞',bP:'♟'};
-const FILES='abcdefgh';
+// ═══════════════════════════════════════════════════
+//  CHESS ENGINE — Chessboard.js + Chess.js
+// ═══════════════════════════════════════════════════
 
-function initBoard(){
-  return [
-    ['bR','bN','bB','bQ','bK','bB','bN','bR'],
-    ['bP','bP','bP','bP','bP','bP','bP','bP'],
-    [null,null,null,null,null,null,null,null],
-    [null,null,null,null,null,null,null,null],
-    [null,null,null,null,null,null,null,null],
-    [null,null,null,null,null,null,null,null],
-    ['wP','wP','wP','wP','wP','wP','wP','wP'],
-    ['wR','wN','wB','wQ','wK','wB','wN','wR'],
-  ];
+const BOARDS = {};   // opening boards  { id: {board, game, moves, idx} }
+const PBOARDS = {};  // puzzle boards    { pid: {board, game, answer, solved} }
+
+// ── Opening board: step through moves ──
+function initOpeningBoard(id, movesStr) {
+  const moves = movesStr.trim().split(/\s+/).filter(m => m && !/^\d+\./.test(m));
+  const game = new Chess();
+  const el = document.getElementById(id);
+  if (!el) return;
+  const board = Chessboard(id, {
+    position: 'start',
+    pieceTheme: 'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/{piece}.png',
+    draggable: false,
+    showNotation: true,
+  });
+  // Pre-compute positions
+  const positions = ['start'];
+  const tempGame = new Chess();
+  moves.forEach(m => {
+    tempGame.move(m, {sloppy: true});
+    positions.push(tempGame.fen());
+  });
+  BOARDS[id] = {board, game: tempGame, moves, positions, idx: 0};
+  updateBoardCtr(id);
 }
 
-function pathClear(b,fr,fc,tr,tc){
-  const sr=Math.sign(tr-fr),sc=Math.sign(tc-fc);
-  let r=fr+sr,c=fc+sc;
-  while(r!==tr||c!==tc){if(b[r][c])return false;r+=sr;c+=sc;}
-  return true;
+function stepMove(id, dir) {
+  const s = BOARDS[id]; if (!s) return;
+  s.idx = Math.max(0, Math.min(s.positions.length - 1, s.idx + dir));
+  s.board.position(s.positions[s.idx]);
+  updateBoardCtr(id);
 }
 
-function canReach(b,fr,fc,tr,tc,piece,color){
-  const dr=tr-fr,dc=tc-fc;
-  if(b[tr][tc]&&b[tr][tc][0]===color)return false;
-  if(piece==='P'){
-    const dir=color==='w'?-1:1;
-    if(dc===0){
-      if(dr===dir&&!b[tr][tc])return true;
-      if(dr===2*dir&&!b[tr][tc]&&!b[fr+dir][fc]&&(color==='w'?fr===6:fr===1))return true;
-    }else if(Math.abs(dc)===1&&dr===dir&&b[tr][tc])return true;
-    return false;
+function resetBoard(id) {
+  const s = BOARDS[id]; if (!s) return;
+  s.idx = 0;
+  s.board.position('start');
+  updateBoardCtr(id);
+}
+
+function playAll(id) {
+  const s = BOARDS[id]; if (!s) return;
+  s.idx = 0; s.board.position('start'); updateBoardCtr(id);
+  const iv = setInterval(() => {
+    if (s.idx >= s.positions.length - 1) { clearInterval(iv); return; }
+    s.idx++;
+    s.board.position(s.positions[s.idx]);
+    updateBoardCtr(id);
+  }, 700);
+}
+
+function updateBoardCtr(id) {
+  const s = BOARDS[id]; const el = document.getElementById(`${id}_ctr`);
+  if (!el || !s) return;
+  const cur = s.idx; const total = s.moves.length;
+  if (cur === 0) el.textContent = `Starting position · ${total} moves in opening`;
+  else {
+    const side = cur % 2 === 1 ? 'White' : 'Black';
+    el.textContent = `Move ${cur}/${total} · ${side}: ${s.moves[cur-1]}`;
   }
-  if(piece==='N')return(Math.abs(dr)===2&&Math.abs(dc)===1)||(Math.abs(dr)===1&&Math.abs(dc)===2);
-  if(piece==='K')return Math.abs(dr)<=1&&Math.abs(dc)<=1;
-  if(piece==='R'){if(dr!==0&&dc!==0)return false;return pathClear(b,fr,fc,tr,tc);}
-  if(piece==='B'){if(Math.abs(dr)!==Math.abs(dc))return false;return pathClear(b,fr,fc,tr,tc);}
-  if(piece==='Q'){if(dr===0||dc===0||Math.abs(dr)===Math.abs(dc))return pathClear(b,fr,fc,tr,tc);return false;}
-  return false;
 }
 
-function applyMove(board,moveStr,isWhite){
-  const b=board.map(r=>[...r]);
-  const color=isWhite?'w':'b';
-  moveStr=moveStr.replace(/[+#!=?]/g,'').trim();
-  if(moveStr==='O-O'||moveStr==='0-0'){const row=isWhite?7:0;b[row][6]=b[row][4];b[row][4]=null;b[row][5]=b[row][7];b[row][7]=null;return b;}
-  if(moveStr==='O-O-O'||moveStr==='0-0-0'){const row=isWhite?7:0;b[row][2]=b[row][4];b[row][4]=null;b[row][3]=b[row][0];b[row][0]=null;return b;}
-  const toFile=moveStr[moveStr.length-2],toRank=moveStr[moveStr.length-1];
-  const toCol=FILES.indexOf(toFile),toRow=8-parseInt(toRank);
-  if(toCol<0||toRow<0||toRow>7)return b;
-  let pieceType='P';
-  if(moveStr[0]>='A'&&moveStr[0]<='Z')pieceType=moveStr[0];
-  let hintFile='',hintRank='';
-  const inner=moveStr.slice(pieceType==='P'?0:1).replace(/x/,'').slice(0,-2);
-  for(const ch of inner){if(ch>='a'&&ch<='h')hintFile=ch;else if(ch>='1'&&ch<='8')hintRank=ch;}
-  let fromRow=-1,fromCol=-1;
-  outer:for(let r=0;r<8;r++)for(let c=0;c<8;c++){
-    const sq=b[r][c];
-    if(!sq||sq[0]!==color||sq[1]!==pieceType)continue;
-    if(hintFile&&FILES[c]!==hintFile)continue;
-    if(hintRank&&(8-r).toString()!==hintRank)continue;
-    if(canReach(b,r,c,toRow,toCol,pieceType,color)){fromRow=r;fromCol=c;break outer;}
-  }
-  if(fromRow<0)return b;
-  b[toRow][toCol]=b[fromRow][fromCol];b[fromRow][fromCol]=null;
-  if(pieceType==='P'&&(toRow===0||toRow===7))b[toRow][toCol]=color+'Q';
-  return b;
-}
+// ── Puzzle board: fully interactive drag-and-drop ──
+function initPuzzleBoard(pid, fen, answer) {
+  const game = new Chess(fen);
+  const turn = game.turn(); // 'w' or 'b'
+  const el = document.getElementById(pid);
+  if (!el) return;
 
-function parseMoves(s){return s.trim().split(/\s+/).filter(m=>m&&!/^\d+\./.test(m));}
+  const board = Chessboard(pid, {
+    position: fen,
+    pieceTheme: 'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/{piece}.png',
+    draggable: true,
+    orientation: turn === 'w' ? 'white' : 'black',
+    onDragStart: (src, piece) => {
+      const state = PBOARDS[pid];
+      if (!state || state.solved) return false;
+      // Only allow dragging the correct color
+      if ((game.turn() === 'w' && piece.search(/^b/) !== -1)) return false;
+      if ((game.turn() === 'b' && piece.search(/^w/) !== -1)) return false;
+    },
+    onDrop: (src, tgt) => {
+      const state = PBOARDS[pid];
+      if (!state || state.solved) return 'snapback';
 
-const BS={};
+      // Try the move
+      const move = game.move({ from: src, to: tgt, promotion: 'q' });
+      if (move === null) return 'snapback';
 
-function buildBoardHTML(id){
-  let h=`<div class="cboard" id="${id}">`;
-  for(let r=0;r<8;r++)for(let c=0;c<8;c++){
-    const light=(r+c)%2===0;
-    h+=`<div class="sq ${light?'light':'dark'}" id="${id}_${r}_${c}"></div>`;
-  }
-  return h+'</div>';
-}
+      // Check if it matches the answer
+      const ans = state.answer.replace(/[+#]/g, '');
+      const moveStr = move.san.replace(/[+#]/g, '');
+      const moveUCI = src + tgt;
+      const ansNorm = ans.toLowerCase().replace(/x/g, '');
+      const movNorm = moveStr.toLowerCase().replace(/x/g, '');
+      const uciNorm = ansUCI(ans, game);
 
-// ── CHESS SOUND ENGINE ──────────────────────────────────────
-const AudioCtx=window.AudioContext||window.webkitAudioContext;
-let actx=null;
-function getACtx(){if(!actx)actx=new AudioCtx();return actx;}
-
-function playMoveSound(type='move'){
-  try{
-    const ac=getACtx();
-    if(type==='move'){
-      // Wooden piece-on-board thud — two-layer: click + resonance
-      const buf=ac.createBuffer(1,ac.sampleRate*0.18,ac.sampleRate);
-      const d=buf.getChannelData(0);
-      for(let i=0;i<d.length;i++){
-        const t=i/ac.sampleRate;
-        d[i]=(Math.random()*2-1)*Math.exp(-t*55)*(0.6+0.4*Math.exp(-t*120));
+      if (movNorm === ansNorm || moveUCI === uciNorm || moveStr === state.answer.replace(/[+#]/g,'')) {
+        state.solved = true;
+        board.position(game.fen());
+        showPuzzleFeedback(pid, 'correct');
+      } else {
+        // Wrong — undo and snap back
+        game.undo();
+        showPuzzleFeedback(pid, 'wrong');
+        return 'snapback';
       }
-      const src=ac.createBufferSource();src.buffer=buf;
-      const g=ac.createGain();g.gain.setValueAtTime(0.55,ac.currentTime);
-      // Slight low-pass to make it warmer/woodier
-      const f=ac.createBiquadFilter();f.type='lowpass';f.frequency.value=2800;
-      src.connect(f);f.connect(g);g.connect(ac.destination);
-      src.start();
-    } else if(type==='capture'){
-      // Heavier thud for captures
-      const buf=ac.createBuffer(1,ac.sampleRate*0.22,ac.sampleRate);
-      const d=buf.getChannelData(0);
-      for(let i=0;i<d.length;i++){
-        const t=i/ac.sampleRate;
-        d[i]=(Math.random()*2-1)*Math.exp(-t*38)*(0.9+0.4*Math.exp(-t*90));
-      }
-      const src=ac.createBufferSource();src.buffer=buf;
-      const g=ac.createGain();g.gain.setValueAtTime(0.75,ac.currentTime);
-      const f=ac.createBiquadFilter();f.type='lowpass';f.frequency.value=2200;
-      src.connect(f);f.connect(g);g.connect(ac.destination);
-      src.start();
-    } else if(type==='check'){
-      // Higher pitched alert tone
-      const osc=ac.createOscillator();const g=ac.createGain();
-      osc.connect(g);g.connect(ac.destination);
-      osc.frequency.setValueAtTime(880,ac.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(660,ac.currentTime+0.12);
-      g.gain.setValueAtTime(0.3,ac.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.22);
-      osc.start();osc.stop(ac.currentTime+0.22);
-    } else if(type==='start'){
-      // Soft thud for board reset
-      const buf=ac.createBuffer(1,ac.sampleRate*0.12,ac.sampleRate);
-      const d=buf.getChannelData(0);
-      for(let i=0;i<d.length;i++){
-        const t=i/ac.sampleRate;
-        d[i]=(Math.random()*2-1)*Math.exp(-t*80)*0.4;
-      }
-      const src=ac.createBufferSource();src.buffer=buf;
-      const g=ac.createGain();g.gain.value=0.35;
-      const f=ac.createBiquadFilter();f.type='lowpass';f.frequency.value=3200;
-      src.connect(f);f.connect(g);g.connect(ac.destination);
-      src.start();
-    }
-  }catch(e){}
+    },
+    onSnapEnd: () => { board.position(game.fen()); }
+  });
+
+  PBOARDS[pid] = { board, game, answer, fen, solved: false };
 }
 
-function detectMoveType(boardBefore,boardAfter){
-  if(!boardBefore||!boardAfter)return'move';
-  // Count pieces on boardAfter vs boardBefore — if fewer pieces, it's a capture
-  let before=0,after=0;
-  for(let r=0;r<8;r++)for(let c=0;c<8;c++){
-    if(boardBefore[r][c])before++;
-    if(boardAfter[r][c])after++;
-  }
-  return after<before?'capture':'move';
+function ansUCI(san, game) {
+  // Convert SAN to UCI for comparison
+  const moves = game.moves({ verbose: true });
+  const sanClean = san.replace(/[+#]/g, '');
+  const found = moves.find(m => m.san.replace(/[+#]/g,'') === sanClean);
+  return found ? found.from + found.to : '';
 }
-// ── END SOUND ENGINE ─────────────────────────────────────────
 
-function renderBoard(id,board,lmFrom,lmTo){
-  for(let r=0;r<8;r++)for(let c=0;c<8;c++){
-    const el=document.getElementById(`${id}_${r}_${c}`);
-    if(!el)continue;
-    const p=board[r][c];
-    if(p&&PC[p]){
-      const cls=p[0]==='w'?'wp':'bp';
-      el.innerHTML=`<span class="${cls}">${PC[p]}</span>`;
-    } else {
-      el.innerHTML='';
-    }
-    el.classList.remove('lm');
-    if(lmFrom&&lmFrom[0]===r&&lmFrom[1]===c)el.classList.add('lm');
-    if(lmTo&&lmTo[0]===r&&lmTo[1]===c)el.classList.add('lm');
+function showPuzzleFeedback(pid, type) {
+  const el = document.getElementById(`${pid}_feedback`);
+  if (!el) return;
+  if (type === 'correct') {
+    el.innerHTML = '<span style="color:#2ecc71;font-size:15px;font-weight:600">✅ Correct! Excellent move.</span>';
+  } else {
+    el.innerHTML = '<span style="color:#e85d3a;font-size:15px">❌ Wrong move — try again!</span>';
+    setTimeout(() => { if (el && !PBOARDS[pid]?.solved) el.innerHTML = '<span style="color:var(--muted)">💭 Keep trying...</span>'; }, 2000);
   }
 }
 
-function initOpeningBoard(id,movesStr){
-  const moves=parseMoves(movesStr);
-  const boards=[initBoard()];
-  let cur=initBoard();
-  for(let i=0;i<moves.length;i++){cur=applyMove(cur,moves[i],i%2===0);boards.push(cur.map(r=>[...r]));}
-  BS[id]={moves,currentMove:0,boards};
-  renderBoard(id,initBoard(),null,null);
-  updateCtr(id);
+function resetPuzzle(pid, fenOrEl, answer) {
+  const state = PBOARDS[pid];
+  if (!state) return;
+  const fen = state.fen;
+  state.game = new Chess(fen);
+  state.solved = false;
+  state.board.position(fen);
+  const fb = document.getElementById(`${pid}_feedback`);
+  if (fb) fb.innerHTML = '<span style="color:var(--muted)">Your turn — drag a piece to move</span>';
 }
 
-function stepMove(id,dir){
-  const s=BS[id];if(!s)return;
-  const prev=s.currentMove;
-  s.currentMove=Math.max(0,Math.min(s.boards.length-1,s.currentMove+dir));
-  if(s.currentMove!==prev&&dir!==0){
-    const type=detectMoveType(s.boards[prev],s.boards[s.currentMove]);
-    playMoveSound(type);
+function revealPuzzleAnswer(pid, answer) {
+  const state = PBOARDS[pid];
+  if (!state) return;
+  const move = state.game.move(answer, { sloppy: true });
+  if (move) {
+    state.board.position(state.game.fen());
+    state.solved = true;
   }
-  renderBoard(id,s.boards[s.currentMove],null,null);
-  updateCtr(id);
+  const fb = document.getElementById(`${pid}_feedback`);
+  if (fb) fb.innerHTML = `<span style="color:var(--gold)">💡 Answer: <strong>${answer}</strong></span>`;
 }
 
-function resetBoard(id){const s=BS[id];if(!s)return;s.currentMove=0;renderBoard(id,s.boards[0],null,null);updateCtr(id);playMoveSound('start');}
-
-function playAll(id){
-  const s=BS[id];if(!s)return;
-  s.currentMove=0;renderBoard(id,s.boards[0],null,null);updateCtr(id);playMoveSound('start');
-  const iv=setInterval(()=>{
-    if(s.currentMove>=s.boards.length-1){clearInterval(iv);return;}
-    const prev=s.currentMove;
-    s.currentMove++;
-    const type=detectMoveType(s.boards[prev],s.boards[s.currentMove]);
-    playMoveSound(type);
-    renderBoard(id,s.boards[s.currentMove],null,null);updateCtr(id);
-  },650);
+function buildBoardHTML(id, size=280) {
+  return `<div id="${id}" style="width:${size}px"></div>`;
 }
 
-function updateCtr(id){
-  const s=BS[id];const el=document.getElementById(`${id}_ctr`);if(!el||!s)return;
-  const cur=s.currentMove,total=s.moves.length;
-  if(cur===0){el.textContent=`Starting position · ${total} moves total`;}
-  else{
-    const side=cur%2===1?'White':'Black';
-    el.textContent=`Move ${cur}/${total} · ${side}: ${s.moves[cur-1]}`;
-  }
+function buildPuzzleBoard(pid, size=260) {
+  return `<div id="${pid}" style="width:${size}px;cursor:grab"></div>`;
 }
 
-// ═══════════════════════════════════
+// ═══════════════════════════════════════════════════
 //  UI + API
-// ═══════════════════════════════════
+// ═══════════════════════════════════════════════════
 const COLORS={Aggressive:"#e85d3a",Classical:"#3a7bd5",Strategic:"#2ecc71",Solid:"#9b59b6"};
 
 window.onload=async()=>{
@@ -1319,118 +1269,95 @@ function renderResult(d){
   //  RENDER RESULT
   // ═══════════════════════════════════════════
   // Opening cards with boards + puzzles + chess.com link
-  document.getElementById("olist").innerHTML=d.openings.map((o,i)=>{
-    const bid=`board_${i}`;
-    const puzzles=o.puzzles||[];
-
-    const puzzleHTML=puzzles.map((pz,pi)=>{
-      const pid=`pz_${i}_${pi}`;
+    // ════════════════════════════════════════
+  // RENDER OPENING CARDS (White + Black)
+  // ════════════════════════════════════════
+  function renderOpeningCard(o, i, prefix, label, col) {
+    const bid = `${prefix}_board_${i}`;
+    const puzzles = o.puzzles || [];
+    const puzzleHTML = puzzles.map((pz, pi) => {
+      const pid = `${prefix}_pz_${i}_${pi}`;
       return `
-      <div class="pcard" id="pcard_${i}_${pi}">
+      <div class="pcard">
         <div class="pnum">Puzzle ${pi+1} of ${puzzles.length}</div>
         <div class="pprompt">${pz.prompt}</div>
-        <div class="pboard-wrap">
-          ${buildPuzzleBoard(pid)}
-        </div>
+        <div class="pboard-wrap">${buildPuzzleBoard(pid, 240)}</div>
         <div class="pfeedback" id="${pid}_feedback">
-          <span style="color:var(--muted)">Your turn — click a piece to move</span>
+          <span style="color:var(--muted)">Your turn — drag a piece to move</span>
         </div>
         <div class="pbtnrow">
           <button class="bbtn" onclick="revealPuzzleAnswer('${pid}','${pz.answer}')">💡 Show Answer</button>
-          <button class="bbtn" onclick="resetPuzzle('${pid}',this.dataset.fen,'${pz.answer}')" data-fen="${pz.fen}">🔄 Reset</button>
+          <button class="bbtn" onclick="resetPuzzle('${pid}',null,'${pz.answer}')">🔄 Reset</button>
         </div>
       </div>`;
-    }).join("");
+    }).join('');
 
     return `
     <div class="ocard" style="border-top:3px solid ${col}">
       <div class="oinfo">
-        <div class="orank">#${i+1} RECOMMENDATION</div>
+        <div class="orank">${label} #${i+1}</div>
         <div class="oname">${o.name}</div>
         <div class="opgn">${o.pgn}</div>
         <div class="owhy">${o.why}</div>
-        <div class="ometa"><strong>Difficulty:</strong> ${o.difficulty} &nbsp;·&nbsp; <strong>Famous players:</strong> ${o.players}</div>
-        <div class="octa">
-          <a href="${o.chesscom||'https://www.chess.com/learn-how-to-play-chess'}" target="_blank" class="btn btn-chesscom">♟ Try on Chess.com</a>
+        <div class="ometa">
+          <strong>Difficulty:</strong> ${o.difficulty} &nbsp;·&nbsp;
+          <strong>Famous players:</strong> ${o.players}
         </div>
+        <a href="${o.chesscom||'https://www.chess.com'}" target="_blank" class="btn btn-chesscom" style="margin-top:12px;display:inline-flex">♟ Study on Chess.com</a>
       </div>
       <div class="bwrap">
         <div class="otabs">
-          <button class="otab active" onclick="switchTab(this,'${bid}_board','${bid}_puzzles')">📋 Opening Moves</button>
-          <button class="otab" onclick="switchTab(this,'${bid}_puzzles','${bid}_board')">🧩 Puzzles (${puzzles.length})</button>
+          <button class="otab active" onclick="switchTab(this,'${bid}','${bid}_pz')">📋 Opening Moves</button>
+          <button class="otab" onclick="switchTab(this,'${bid}_pz','${bid}')">🧩 Puzzles (${puzzles.length})</button>
         </div>
-        <div id="${bid}_board">
-          ${buildBoardHTML(bid)}
+        <div id="${bid}_wrap" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 0">
+          ${buildBoardHTML(bid, 280)}
           <div class="mctr" id="${bid}_ctr"></div>
           <div class="bcontrols">
-            <button class="bbtn" onclick="resetBoard('${bid}')">⏮ Start</button>
+            <button class="bbtn" onclick="resetBoard('${bid}')">⏮</button>
             <button class="bbtn" onclick="stepMove('${bid}',-1)">◀</button>
             <button class="bbtn" onclick="playAll('${bid}')">▶ Play</button>
             <button class="bbtn" onclick="stepMove('${bid}',1)">▶|</button>
           </div>
         </div>
-        <div id="${bid}_puzzles" style="display:none;overflow-y:auto;max-height:520px">
-          ${puzzleHTML||'<p style="color:var(--muted);padding:16px">No puzzles for this opening yet.</p>'}
+        <div id="${bid}_pz" style="display:none;overflow-y:auto;max-height:420px;padding:4px">
+          ${puzzleHTML || '<p style="color:var(--muted);padding:16px">No puzzles yet.</p>'}
         </div>
       </div>
     </div>`;
-  }).join("");
-
-  // Init opening boards
-  setTimeout(()=>{
-    d.openings.forEach((o,i)=>{
-      initOpeningBoard(`board_${i}`,o.moves);
-      // Init puzzle boards
-      (o.puzzles||[]).forEach((pz,pi)=>{
-        const pid=`pz_${i}_${pi}`;
-        initPuzzleBoard(pid, pz.fen, pz.answer);
-      });
-    });
-  },80);
-
-  document.getElementById("mcredit").textContent=`Predicted by ${d.model_used} · ${d.model_accuracy}% accuracy`;
-  document.getElementById("result").style.display="block";
-
-  // ── Black Openings ──
-  const blackOps = d.black_openings || [];
-  if(blackOps.length > 0){
-    document.getElementById("black-family-label").textContent = d.predicted_family;
-    document.getElementById("black-section").style.display="block";
-    document.getElementById("black-olist").innerHTML = blackOps.map((o,i)=>{
-      const bid = `bboard_${i}`;
-      return `
-      <div class="ocard" style="border-top:3px solid ${col};margin-bottom:16px;">
-        <div class="oinfo">
-          <div class="orank" style="color:var(--muted)">#${i+1} AS BLACK</div>
-          <div class="oname">${o.name}</div>
-          <div class="opgn">${o.pgn}</div>
-          <div class="owhy">${o.why}</div>
-          <div class="ometa">
-            <strong>Difficulty:</strong> ${o.difficulty} &nbsp;·&nbsp;
-            <strong>Famous players:</strong> ${o.players}
-          </div>
-          <div class="octa" style="margin-top:12px;">
-            <a href="${o.chesscom||'https://chess.com'}" target="_blank" class="btn btn-chesscom">♟ Study on Chess.com</a>
-          </div>
-        </div>
-        <div class="bwrap">
-          ${buildBoardHTML(bid)}
-          <div class="mctr" id="${bid}_ctr"></div>
-          <div class="bcontrols">
-            <button class="bbtn" onclick="resetBoard('${bid}')">⏮ Start</button>
-            <button class="bbtn" onclick="stepMove('${bid}',-1)">◀</button>
-            <button class="bbtn" onclick="playAll('${bid}')">▶ Play</button>
-            <button class="bbtn" onclick="stepMove('${bid}',1)">▶|</button>
-          </div>
-        </div>
-      </div>`;
-    }).join("");
-
-    setTimeout(()=>{
-      blackOps.forEach((o,i)=>initOpeningBoard(`bboard_${i}`, o.moves));
-    }, 100);
   }
 
+  // White openings
+  document.getElementById("olist").innerHTML = d.openings.map((o,i) =>
+    renderOpeningCard(o, i, 'w', '⬜ PLAYING AS WHITE', col)
+  ).join('');
+
+  // Black openings
+  const blackOps = d.black_openings || [];
+  document.getElementById("black-family-label").textContent = d.predicted_family;
+  document.getElementById("black-section").style.display = blackOps.length ? "block" : "none";
+  document.getElementById("black-olist").innerHTML = blackOps.map((o,i) =>
+    renderOpeningCard(o, i, 'b', '⬛ PLAYING AS BLACK', col)
+  ).join('');
+
+  // Init all boards after DOM renders
+  setTimeout(() => {
+    d.openings.forEach((o, i) => {
+      initOpeningBoard(`w_board_${i}`, o.moves);
+      (o.puzzles || []).forEach((pz, pi) => {
+        initPuzzleBoard(`w_pz_${i}_${pi}`, pz.fen, pz.answer);
+      });
+    });
+    blackOps.forEach((o, i) => {
+      initOpeningBoard(`b_board_${i}`, o.moves);
+      (o.puzzles || []).forEach((pz, pi) => {
+        initPuzzleBoard(`b_pz_${i}_${pi}`, pz.fen, pz.answer);
+      });
+    });
+  }, 150);
+
+  document.getElementById("mcredit").textContent = `Predicted by ${d.model_used} · ${d.model_accuracy}% accuracy`;
+  document.getElementById("result").style.display = "block";
   document.getElementById("result").scrollIntoView({behavior:"smooth"});
 }
 </script>
