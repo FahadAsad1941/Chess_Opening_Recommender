@@ -477,7 +477,7 @@ def train_models(records, progress_cb=None):
         "Random Forest":  (RandomForestClassifier(n_estimators=50,random_state=42,n_jobs=-1), False),
         "Logistic Reg":   (LogisticRegression(max_iter=300,random_state=42), True),
         "SVM Linear":     (SVC(kernel="linear",C=1.0,probability=True,random_state=42,max_iter=2000), True),
-        "Neural Network": (MLPClassifier(hidden_layer_sizes=(128,64),activation="relu",max_iter=300,random_state=42,early_stopping=True,validation_fraction=0.1), True),
+        "Neural Network": (MLPClassifier(hidden_layer_sizes=(128,64),activation="relu",max_iter=300,random_state=42,early_stopping=False), True),
     }
     results={}; best_acc,best_name,best_model=0,None,None
     for name,(model,scaled) in mdls.items():
@@ -858,7 +858,7 @@ function initOpeningBoard(id, movesStr) {
   if (!el) return;
   const board = Chessboard(id, {
     position: 'start',
-    pieceTheme: 'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/{piece}.png',
+    pieceTheme: 'https://raw.githubusercontent.com/oakmac/chessboardjs/master/website/img/chesspieces/wikipedia/{piece}.png',
     draggable: false,
     showNotation: true,
   });
@@ -918,7 +918,7 @@ function initPuzzleBoard(pid, fen, answer) {
 
   const board = Chessboard(pid, {
     position: fen,
-    pieceTheme: 'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/{piece}.png',
+    pieceTheme: 'https://raw.githubusercontent.com/oakmac/chessboardjs/master/website/img/chesspieces/wikipedia/{piece}.png',
     draggable: true,
     orientation: turn === 'w' ? 'white' : 'black',
     onDragStart: (src, piece) => {
@@ -1136,7 +1136,7 @@ function renderResult(d){
     const turn=game.turn();
     const board=Chessboard(pid,{
       position:fen,
-      pieceTheme:'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/{piece}.png',
+      pieceTheme:'https://raw.githubusercontent.com/oakmac/chessboardjs/master/website/img/chesspieces/wikipedia/{piece}.png',
       draggable:true,
       orientation:turn==='w'?'white':'black',
       onDragStart:(src,piece)=>{
